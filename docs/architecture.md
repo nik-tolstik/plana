@@ -2,7 +2,7 @@
 
 ## Назначение
 
-`plana` - React-приложение на TanStack Start. Проект использует file-based routing TanStack Router, Tailwind CSS v4 для стилей, shadcn/ui на Base UI для локальных UI-примитивов, TanStack Query для серверного состояния и FSD как файловую архитектуру.
+`plana` - React-приложение на TanStack Start. Проект использует file-based routing TanStack Router, Tailwind CSS v4 для стилей, shadcn/ui на Base UI для локальных UI-примитивов, TanStack Query для серверного состояния, i18next/react-i18next для локализации и FSD как файловую архитектуру.
 
 Этот документ является рабочим архитектурным контрактом для будущих агентов. Если фактическая архитектура меняется, документ нужно обновлять в той же задаче.
 
@@ -13,6 +13,7 @@
 - Typography: Onest через `@fontsource-variable/onest`.
 - Роутинг: TanStack Router с генерацией `src/routeTree.gen.ts`.
 - Server state: TanStack Query.
+- Internationalization: i18next + react-i18next, supported locales `en` and `ru`.
 - Database: PostgreSQL for persistence, configured locally through Docker Compose.
 - ORM/migrations: Drizzle ORM and Drizzle Kit.
 - Формы: `react-hook-form`, `zod`, `@hookform/resolvers`.
@@ -32,6 +33,7 @@
 - `src/features` - пользовательские сценарии и действия.
 - `src/entities` - доменные сущности и их модель.
 - `src/shared` - переиспользуемая инфраструктура, UI-примитивы, API-клиенты, утилиты.
+- `src/shared/i18n` - общая i18n-инфраструктура: поддерживаемые локали, ресурсы переводов, locale detection helpers и переиспользуемый UI переключения языка.
 
 Дополнительно:
 
@@ -67,6 +69,12 @@ src/
       schema.ts
     lib/
       utils.ts
+    i18n/
+      ui/
+        language-switcher.tsx
+      i18n.ts
+      locale.ts
+      resources.ts
     ui/
       button/
         Button.tsx
@@ -80,13 +88,27 @@ src/
 
 TanStack Router использует route-файлы в `src/routes`. Роут `/` объявлен в `src/routes/index.tsx` и рендерит `HomePage` из `src/pages/home`.
 
-`src/routes/__root.tsx` задает HTML shell, global head, scripts и глобальные devtools. На этом же уровне подключается `QueryProvider`, чтобы TanStack Query был доступен всем страницам.
+`src/routes/__root.tsx` задает HTML shell, global head, scripts и глобальные devtools. На этом же уровне определяется начальная локаль и подключаются `I18nProvider` и `QueryProvider`, чтобы i18n и TanStack Query были доступны всем страницам.
 
 После добавления или изменения route-файлов запускай:
 
 ```bash
 corepack pnpm generate-routes
 ```
+
+## i18n
+
+Локализация построена на `i18next` и `react-i18next`. Сейчас поддерживаются только `en` и `ru`.
+
+Ключевые файлы:
+
+- `src/shared/i18n/locale.ts` - тип `Locale`, список поддерживаемых локалей, cookie helpers и определение локали.
+- `src/shared/i18n/resources.ts` - ресурсы переводов для английского и русского.
+- `src/shared/i18n/i18n.ts` - фабрика i18next instance.
+- `src/app/providers/i18n-provider.tsx` - React provider для приложения и Storybook.
+- `src/shared/i18n/ui/language-switcher.tsx` - shared UI переключения языка.
+
+Локаль не хранится в URL. Порядок выбора языка: cookie `plana-locale`, затем `Accept-Language`/browser language, затем fallback `en`. Новые пользовательские runtime-тексты добавляй в ресурсы переводов сразу для `en` и `ru`; не хардкодь копирайт в route/page/widget/feature компонентах. Storybook-only demo labels могут оставаться английскими, если они не являются runtime-текстами приложения.
 
 ## Server State
 

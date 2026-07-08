@@ -1,12 +1,27 @@
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import { createServerFn } from '@tanstack/react-start'
+import { getRequestHeader } from '@tanstack/react-start/server'
 
-import { QueryProvider } from '#/app/providers'
+import { I18nProvider, QueryProvider } from '#/app/providers'
+import { detectLocale, getAppTitle } from '#/shared/i18n'
 import appCss from '../styles.css?url'
 
+const getRequestLocale = createServerFn({ method: 'GET' }).handler(() =>
+  detectLocale({
+    acceptLanguageHeader: getRequestHeader('accept-language'),
+    cookieHeader: getRequestHeader('cookie'),
+  }),
+)
+
 export const Route = createRootRoute({
-  head: () => ({
+  beforeLoad: async () => {
+    const locale = await getRequestLocale()
+
+    return { locale }
+  },
+  head: ({ match }) => ({
     meta: [
       {
         charSet: 'utf-8',
@@ -16,7 +31,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'TanStack Start Starter',
+        title: getAppTitle(match.context.locale),
       },
     ],
     links: [
@@ -30,13 +45,17 @@ export const Route = createRootRoute({
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  const { locale } = Route.useRouteContext()
+
   return (
-    <html lang="en">
+    <html lang={locale}>
       <head>
         <HeadContent />
       </head>
       <body>
-        <QueryProvider>{children}</QueryProvider>
+        <I18nProvider locale={locale}>
+          <QueryProvider>{children}</QueryProvider>
+        </I18nProvider>
         <TanStackDevtools
           config={{
             position: 'bottom-right',
