@@ -17,7 +17,7 @@ export function HomePage() {
           {[
             ['Routing', 'TanStack Router'],
             ['Server state', 'TanStack Query'],
-            ['UI system', 'Tailwind + Base UI'],
+            ['UI system', 'Tailwind + shadcn/Base UI'],
           ].map(([label, value]) => (
             <div
               className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4"

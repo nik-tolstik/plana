@@ -2,14 +2,15 @@
 
 ## Назначение
 
-`plana` - React-приложение на TanStack Start. Проект использует file-based routing TanStack Router, Tailwind CSS v4 для стилей, Base UI для headless-компонентов, TanStack Query для серверного состояния и FSD как файловую архитектуру.
+`plana` - React-приложение на TanStack Start. Проект использует file-based routing TanStack Router, Tailwind CSS v4 для стилей, shadcn/ui на Base UI для локальных UI-примитивов, TanStack Query для серверного состояния и FSD как файловую архитектуру.
 
 Этот документ является рабочим архитектурным контрактом для будущих агентов. Если фактическая архитектура меняется, документ нужно обновлять в той же задаче.
 
 ## Текущий стек
 
 - Runtime и сборка: Vite + TanStack Start.
-- UI: React 19, Tailwind CSS v4, Base UI (`@base-ui/react`), `lucide-react`.
+- UI: React 19, Tailwind CSS v4, shadcn/ui preset `base-maia` на Base UI (`@base-ui/react`), `lucide-react`.
+- Typography: Onest через `@fontsource-variable/onest`.
 - Роутинг: TanStack Router с генерацией `src/routeTree.gen.ts`.
 - Server state: TanStack Query.
 - Database: PostgreSQL for persistence, configured locally through Docker Compose.
@@ -64,6 +65,12 @@ src/
       client.ts
       index.ts
       schema.ts
+    lib/
+      utils.ts
+    ui/
+      button/
+        Button.tsx
+        index.ts
   routeTree.gen.ts
   router.tsx
   styles.css
@@ -139,7 +146,27 @@ corepack pnpm db:studio
 
 Tailwind CSS v4 подключен через `@tailwindcss/vite` в `vite.config.ts` и `@import "tailwindcss";` в `src/styles.css`.
 
-Base UI установлен как `@base-ui/react`. Используй его для доступных headless-примитивов и стилизуй через Tailwind. Не добавляй вторую UI-библиотеку без обновления этого документа и явного основания.
+shadcn/ui настроен через `components.json` с preset `base-maia`, Base UI primitives и aliases:
+
+- `@/shared/ui` - локальные UI-компоненты shadcn.
+- `@/shared/lib/utils` - общий `cn` helper.
+
+Каждый UI-компонент shadcn размещай в отдельной lowercase-папке внутри `src/shared/ui`, а файл компонента называй в PascalCase:
+
+```text
+src/shared/ui/button/Button.tsx
+src/shared/ui/button/index.ts
+```
+
+Для добавления компонентов используй shadcn CLI через Corepack/pnpm, затем приводи сгенерированные файлы к этой структуре:
+
+```bash
+corepack pnpm dlx shadcn@latest add <component>
+```
+
+Глобальный шрифт - Onest. Он импортируется в `src/styles.css` через `@fontsource-variable/onest` и подключается к `--font-sans`.
+
+Base UI установлен как `@base-ui/react`. Используй его напрямую только когда shadcn-компонента недостаточно; общие UI-примитивы держи в `src/shared/ui` и стилизуй через Tailwind. Не добавляй вторую UI-библиотеку без обновления этого документа и явного основания.
 
 ## Тестирование
 
