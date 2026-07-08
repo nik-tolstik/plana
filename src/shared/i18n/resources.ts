@@ -32,6 +32,12 @@ const enTranslation = {
     russian: 'Russian',
     switcherLabel: 'Change language',
   },
+  theme: {
+    dark: 'Dark',
+    light: 'Light',
+    system: 'System',
+    switcherLabel: 'Change theme',
+  },
 } as const
 
 const ruTranslation = {
@@ -57,6 +63,12 @@ const ruTranslation = {
     menuLabel: 'Язык',
     russian: 'Русский',
     switcherLabel: 'Сменить язык',
+  },
+  theme: {
+    dark: 'Темная',
+    light: 'Светлая',
+    system: 'Система',
+    switcherLabel: 'Сменить тему',
   },
 } as const satisfies DeepStringMap<typeof enTranslation>
 

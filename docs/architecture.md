@@ -14,6 +14,7 @@
 - Роутинг: TanStack Router с генерацией `src/routeTree.gen.ts`.
 - Server state: TanStack Query.
 - Internationalization: i18next + react-i18next, supported locales `en` and `ru`.
+- Theme: first-party light/dark/system theme through CSS variables and an `html.dark` class.
 - Database: PostgreSQL for persistence, configured locally through Docker Compose.
 - ORM/migrations: Drizzle ORM and Drizzle Kit.
 - Формы: `react-hook-form`, `zod`, `@hookform/resolvers`.
@@ -34,6 +35,7 @@
 - `src/entities` - доменные сущности и их модель.
 - `src/shared` - переиспользуемая инфраструктура, UI-примитивы, API-клиенты, утилиты.
 - `src/shared/i18n` - общая i18n-инфраструктура: поддерживаемые локали, ресурсы переводов, locale detection helpers и переиспользуемый UI переключения языка.
+- `src/shared/theme` - общая theme-инфраструктура: поддерживаемые темы, cookie helpers, theme detection и React provider/hook.
 
 Дополнительно:
 
@@ -50,7 +52,13 @@ drizzle/
 src/
   app/
     providers/
+      theme-provider.tsx
       query-provider.tsx
+      index.ts
+  features/
+    theme-switcher/
+      ui/
+        theme-switcher.tsx
       index.ts
   pages/
     home/
@@ -75,9 +83,15 @@ src/
       i18n.ts
       locale.ts
       resources.ts
+    theme/
+      theme-provider.tsx
+      theme.ts
     ui/
       button/
         Button.tsx
+        index.ts
+      segmented/
+        Segmented.tsx
         index.ts
   routeTree.gen.ts
   router.tsx
@@ -88,7 +102,7 @@ src/
 
 TanStack Router использует route-файлы в `src/routes`. Роут `/` объявлен в `src/routes/index.tsx` и рендерит `HomePage` из `src/pages/home`.
 
-`src/routes/__root.tsx` задает HTML shell, global head, scripts и глобальные devtools. На этом же уровне определяется начальная локаль и подключаются `I18nProvider` и `QueryProvider`, чтобы i18n и TanStack Query были доступны всем страницам.
+`src/routes/__root.tsx` задает HTML shell, global head, scripts и глобальные devtools. На этом же уровне определяется начальная локаль и тема, а также подключаются `I18nProvider`, `ThemeProvider` и `QueryProvider`, чтобы i18n, тема и TanStack Query были доступны всем страницам.
 
 После добавления или изменения route-файлов запускай:
 
@@ -109,6 +123,18 @@ corepack pnpm generate-routes
 - `src/shared/i18n/ui/language-switcher.tsx` - shared UI переключения языка.
 
 Локаль не хранится в URL. Порядок выбора языка: cookie `plana-locale`, затем `Accept-Language`/browser language, затем fallback `en`. Новые пользовательские runtime-тексты добавляй в ресурсы переводов сразу для `en` и `ru`; не хардкодь копирайт в route/page/widget/feature компонентах. Storybook-only demo labels могут оставаться английскими, если они не являются runtime-текстами приложения.
+
+## Theme
+
+Тема приложения построена на CSS-переменных из `src/styles.css` и классе `dark` на `<html>`. Сейчас поддерживаются пользовательские режимы `light`, `dark` и `system`; режим `system` вычисляется в фактическую тему `light` или `dark` через `prefers-color-scheme`.
+
+Ключевые файлы:
+
+- `src/shared/theme/theme.ts` - тип `Theme`, список поддерживаемых тем, cookie helpers и определение темы.
+- `src/shared/theme/theme-provider.tsx` - React provider и `useTheme` hook, которые применяют resolved-тему к `document.documentElement` и следят за изменениями `prefers-color-scheme`.
+- `src/features/theme-switcher` - пользовательский переключатель темы на `Segmented`.
+
+Выбранный режим сохраняется в cookie `plana-theme`, чтобы TanStack Start мог выставить правильный `<html class="dark">` уже на серверном рендере для явной темной темы. Для режима `system` сервер использует fallback resolved-тему, а клиент после hydration применяет текущую системную настройку. Пользовательские компоненты должны использовать semantic tokens (`bg-background`, `text-foreground`, `bg-card`, `text-muted-foreground`) вместо жестко заданных dark/light palette classes, если элемент должен реагировать на тему.
 
 ## Server State
 

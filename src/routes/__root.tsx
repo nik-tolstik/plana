@@ -4,8 +4,9 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader } from '@tanstack/react-start/server'
 
-import { I18nProvider, QueryProvider } from '#/app/providers'
+import { I18nProvider, QueryProvider, ThemeProvider } from '#/app/providers'
 import { detectLocale, getAppTitle } from '#/shared/i18n'
+import { detectTheme, resolveTheme } from '#/shared/theme'
 import appCss from '../styles.css?url'
 
 const getRequestLocale = createServerFn({ method: 'GET' }).handler(() =>
@@ -15,11 +16,20 @@ const getRequestLocale = createServerFn({ method: 'GET' }).handler(() =>
   }),
 )
 
+const getRequestTheme = createServerFn({ method: 'GET' }).handler(() =>
+  detectTheme({
+    cookieHeader: getRequestHeader('cookie'),
+  }),
+)
+
 export const Route = createRootRoute({
   beforeLoad: async () => {
-    const locale = await getRequestLocale()
+    const [locale, theme] = await Promise.all([
+      getRequestLocale(),
+      getRequestTheme(),
+    ])
 
-    return { locale }
+    return { locale, theme }
   },
   head: ({ match }) => ({
     meta: [
@@ -45,16 +55,23 @@ export const Route = createRootRoute({
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {
-  const { locale } = Route.useRouteContext()
+  const { locale, theme } = Route.useRouteContext()
+  const resolvedTheme = resolveTheme(theme)
 
   return (
-    <html lang={locale}>
+    <html
+      className={resolvedTheme === 'dark' ? 'dark' : undefined}
+      lang={locale}
+      style={{ colorScheme: resolvedTheme }}
+    >
       <head>
         <HeadContent />
       </head>
       <body>
         <I18nProvider locale={locale}>
-          <QueryProvider>{children}</QueryProvider>
+          <ThemeProvider initialTheme={theme}>
+            <QueryProvider>{children}</QueryProvider>
+          </ThemeProvider>
         </I18nProvider>
         <TanStackDevtools
           config={{
