@@ -2,8 +2,7 @@ import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AppModule } from "../app.module";
-import { HealthController } from "./health.controller";
+import { AppModule } from "../../app.module";
 
 describe("GET /v1/health", () => {
   let app: INestApplication;
@@ -11,10 +10,7 @@ describe("GET /v1/health", () => {
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
-    })
-      .overrideProvider(HealthController)
-      .useClass(HealthController)
-      .compile();
+    }).compile();
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("v1");
@@ -25,7 +21,7 @@ describe("GET /v1/health", () => {
     await app.close();
   });
 
-  it("отвечает status=ok", async () => {
+  it("отвечает status=ok без авторизации", async () => {
     const response = await request(app.getHttpServer()).get("/v1/health").expect(200);
 
     expect(response.body).toEqual(

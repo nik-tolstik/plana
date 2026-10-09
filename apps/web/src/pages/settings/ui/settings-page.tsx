@@ -1,8 +1,24 @@
+import { useSessionStore } from "@/entities/user";
+import { ThemeSwitch } from "@/features/theme-switch";
+
 export function SettingsPage() {
+  const user = useSessionStore((state) => state.user);
+  const setUser = useSessionStore((state) => state.setUser);
+
   return (
     <main>
       <h1>Настройки</h1>
-      <p>Профиль, тема и таймзона появятся на шаге реализации auth.</p>
+      <dl>
+        <dt>Имя</dt>
+        <dd>{user?.name}</dd>
+        <dt>Email</dt>
+        <dd>{user?.email}</dd>
+        <dt>Таймзона</dt>
+        <dd>{user?.timezone}</dd>
+      </dl>
+      <h2>Тема оформления</h2>
+      <ThemeSwitch onUserUpdated={setUser} />
+      <p>Редактирование профиля — на следующем шаге (M2+).</p>
     </main>
   );
 }

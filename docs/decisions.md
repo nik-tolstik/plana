@@ -67,5 +67,15 @@
 
 - `packages/shared` — ESM (`type: module`), поэтому его относительные импорты пишутся с расширением `.js`; api — CommonJS (классический NestJS-стиль), web собирает shared из исходников через alias в `vite.config.ts`.
 - Тесты NestJS в Vitest идут через `unplugin-swc` + `.swcrc` (esbuild не умеет `emitDecoratorMetadata`) — конфиг в `apps/api/vitest.config.mts`.
+- Dev-режим api — только через `nest start --watch` (`@nestjs/cli`, tsc). Запуск исходников лоадерами (tsx, @swc-node/register) не работает: без `emitDecoratorMetadata` DI NestJS молча подставляет undefined вместо зависимостей, а Node 24 дополнительно парсит `.ts`-entry как ESM. Прод-сборка — `nest build` из `tsconfig.build.json` (спеки и `src/test` в dist не попадают).
 - Нативные бинарники: `allowBuilds` в `pnpm-workspace.yaml` (`@swc/core`, `esbuild`).
 - Dockerfile API собирается из корня монорепо (`pnpm deploy --prod`) — параметры для Railway в `docs/deploy.md`.
+
+## 2026-10-09 — Часть 4: M1 готов (auth + профиль + тема)
+
+| Решение                              | Значение                                                                                                                                                                             |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| M1 (auth email+пароль, /v1/me, тема) | Готово и проверено: 16 тестов (shared 3, web 3, api 10), полный зелёный прогон lint/format/typecheck/test/build, ручной smoke в браузере (регистрация → тема → перезагрузка → выход) |
+| Dev-скрипт api                       | `nest start --watch` вместо tsx — см. особенности выше; tsx и @swc-node/register удалены из зависимостей                                                                             |
+| Локальная БД                         | docker-compose postgres:16-alpine на `127.0.0.1:55434` (порты 5432/55432/55433 заняты чужими контейнерами), БД `plana` + `plana_test`                                                |
+| Дорожная карта                       | `docs/roadmap.md` (M1–M9)                                                                                                                                                            |

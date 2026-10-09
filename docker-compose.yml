@@ -1,0 +1,23 @@
+# Локальная БД для разработки. Прод-БД живёт в Railway (см. docs/deploy.md).
+# Порт 55434 выбран, чтобы не конфликтовать с другими локальными postgres (5432, 55432, 55433).
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: plana-postgres
+    environment:
+      POSTGRES_USER: plana
+      POSTGRES_PASSWORD: plana
+      POSTGRES_DB: plana
+    ports:
+      - "127.0.0.1:55434:5432"
+    volumes:
+      - plana-pgdata:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plana -d plana"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  plana-pgdata:
