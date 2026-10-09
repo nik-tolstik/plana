@@ -9,6 +9,23 @@ jobs:
   check:
     name: lint + typecheck + test + build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: plana
+          POSTGRES_PASSWORD: plana
+          POSTGRES_DB: plana_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U plana"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # e2e-тесты apps/api гоняются с этой БД (см. apps/api/vitest.config.mts)
+      DATABASE_URL: postgres://plana:plana@localhost:5432/plana_test
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
