@@ -5,7 +5,10 @@ import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
 import { DatabaseModule } from "./db/database.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { JwtAuthGuard } from "./modules/auth/jwt-auth.guard";
+import { FoldersModule } from "./modules/folders/folders.module";
 import { HealthModule } from "./modules/health/health.module";
+import { ListsModule } from "./modules/lists/lists.module";
+import { SectionsModule } from "./modules/sections/sections.module";
 import { UsersModule } from "./modules/users/users.module";
 
 @Module({
@@ -14,6 +17,9 @@ import { UsersModule } from "./modules/users/users.module";
     DatabaseModule,
     AuthModule,
     UsersModule,
+    FoldersModule,
+    ListsModule,
+    SectionsModule,
     HealthModule,
   ],
   providers: [

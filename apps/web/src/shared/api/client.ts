@@ -63,4 +63,7 @@ export const apiClient = {
   async postVoid(path: string, body: unknown): Promise<void> {
     await request(path, z.unknown(), { method: "POST", body: JSON.stringify(body) });
   },
+  async deleteVoid(path: string): Promise<void> {
+    await request(path, z.unknown(), { method: "DELETE" });
+  },
 };

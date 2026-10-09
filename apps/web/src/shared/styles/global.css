@@ -3,6 +3,9 @@
   --bg: #ffffff;
   --fg: #111827;
   --muted: #6b7280;
+  --border: #e5e7eb;
+  --hover-bg: #f3f4f6;
+  --active-bg: #e5edff;
 }
 
 /* Тёмная тема: системная (по умолчанию) и явные режимы .dark/.light на <html> */
@@ -11,6 +14,9 @@
     --bg: #0b1220;
     --fg: #e5e7eb;
     --muted: #9ca3af;
+    --border: #1f2937;
+    --hover-bg: #111a2c;
+    --active-bg: #1c2d4d;
   }
 }
 
@@ -18,12 +24,18 @@
   --bg: #0b1220;
   --fg: #e5e7eb;
   --muted: #9ca3af;
+  --border: #1f2937;
+  --hover-bg: #111a2c;
+  --active-bg: #1c2d4d;
 }
 
 :root.light {
   --bg: #ffffff;
   --fg: #111827;
   --muted: #6b7280;
+  --border: #e5e7eb;
+  --hover-bg: #f3f4f6;
+  --active-bg: #e5edff;
 }
 
 * {
@@ -37,12 +49,211 @@ body {
   color: var(--fg);
 }
 
-main {
-  max-width: 720px;
-  margin: 0 auto;
+p {
+  color: var(--muted);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--hover-bg);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+input {
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  width: 100%;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* --- Раскладка приложения --- */
+
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  max-width: 860px;
   padding: 24px 16px;
 }
 
-p {
+.auth-main {
+  max-width: 420px;
+  margin: 10vh auto 0;
+  padding: 0 16px;
+}
+
+/* --- Сайдбар --- */
+
+.sidebar {
+  width: 264px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 8px;
+  border-right: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.sidebar-brand {
+  font-size: 20px;
+  font-weight: 700;
+  padding: 4px 8px;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.sidebar-status {
+  font-size: 13px;
+  margin: 0;
+}
+
+.sidebar-error {
+  color: #ef4444;
+}
+
+/* --- Строки дерева (списки, папки) --- */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+  padding: 0 4px 0 0;
+  min-height: 32px;
+}
+
+.row:hover {
+  background: var(--hover-bg);
+}
+
+.row-active {
+  background: var(--active-bg);
+}
+
+.row-disabled {
   color: var(--muted);
+  opacity: 0.6;
+  padding: 4px 10px;
+  cursor: default;
+}
+
+.row-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.folder-toggle {
+  background: none;
+  border: none;
+  font-weight: 600;
+}
+
+.row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-actions {
+  display: none;
+  gap: 2px;
+}
+
+.row:hover .row-actions {
+  display: inline-flex;
+}
+
+.icon-btn {
+  border: none;
+  padding: 2px 5px;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.folder-lists {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 16px;
+}
+
+.add-btn {
+  border: none;
+  color: var(--muted);
+  text-align: left;
+  padding: 4px 8px;
+}
+
+.add-btn:hover {
+  color: var(--fg);
+}
+
+.add-form {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.rename-input {
+  min-height: 28px;
 }

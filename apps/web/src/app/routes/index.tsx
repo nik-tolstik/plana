@@ -1,8 +1,10 @@
 import { type ReactNode } from "react";
 import { Navigate, createBrowserRouter, Outlet } from "react-router";
+import { AppLayout } from "@/app/layouts/app-layout";
 import { useSessionStore } from "@/entities/user";
 import { HabitsPage } from "@/pages/habits";
 import { HomePage } from "@/pages/home";
+import { ListPage } from "@/pages/list";
 import { LoginPage } from "@/pages/login";
 import { SettingsPage } from "@/pages/settings";
 
@@ -29,11 +31,12 @@ export const router = createBrowserRouter([
   {
     element: (
       <RequireAuth>
-        <Outlet />
+        <AppLayout />
       </RequireAuth>
     ),
     children: [
       { path: "/", element: <HomePage /> },
+      { path: "/list/:listId", element: <ListPage /> },
       { path: "/habits", element: <HabitsPage /> },
       { path: "/settings", element: <SettingsPage /> },
     ],

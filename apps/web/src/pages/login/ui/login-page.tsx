@@ -5,7 +5,7 @@ export function LoginPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
 
   return (
-    <main>
+    <main className="auth-main">
       <h1>Plana</h1>
       <div role="tablist" aria-label="Вход или регистрация">
         <button

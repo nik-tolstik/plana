@@ -6,7 +6,7 @@ export function SettingsPage() {
   const setUser = useSessionStore((state) => state.setUser);
 
   return (
-    <main>
+    <>
       <h1>Настройки</h1>
       <dl>
         <dt>Имя</dt>
@@ -18,7 +18,6 @@ export function SettingsPage() {
       </dl>
       <h2>Тема оформления</h2>
       <ThemeSwitch onUserUpdated={setUser} />
-      <p>Редактирование профиля — на следующем шаге (M2+).</p>
-    </main>
+    </>
   );
 }
