@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  "@swc/core": true
+  esbuild: true
+minimumReleaseAgeExclude:
+  - dotenv@18.0.7

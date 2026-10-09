@@ -1,0 +1,24 @@
+# Зависимости и артефакты сборки
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Локальные окружения (коммитим только .env.example)
+.env
+.env.*
+!.env.example
+
+# Vercel / Railway локальные артефакты
+.vercel
+.railway
+
+# Редакторы и ОС
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# Логи
+*.log

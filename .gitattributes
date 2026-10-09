@@ -1,0 +1,12 @@
+# Единый перевод строк во всём репозитории
+* text=auto eol=lf
+
+# Бинарные файлы
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
