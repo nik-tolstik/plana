@@ -11,7 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        # зеркало Docker Hub через Amazon ECR Public — на раннерах GitHub
+        # исчерпывается неподписанный pull rate limit Docker Hub
+        image: public.ecr.aws/docker/library/postgres:16-alpine
         env:
           POSTGRES_USER: plana
           POSTGRES_PASSWORD: plana
