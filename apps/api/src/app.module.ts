@@ -6,6 +6,7 @@ import { DatabaseModule } from "./db/database.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { JwtAuthGuard } from "./modules/auth/jwt-auth.guard";
 import { FoldersModule } from "./modules/folders/folders.module";
+import { HabitsModule } from "./modules/habits/habits.module";
 import { HealthModule } from "./modules/health/health.module";
 import { ListsModule } from "./modules/lists/lists.module";
 import { SectionsModule } from "./modules/sections/sections.module";
@@ -24,6 +25,7 @@ import { UsersModule } from "./modules/users/users.module";
     SectionsModule,
     TagsModule,
     TasksModule,
+    HabitsModule,
     HealthModule,
   ],
   providers: [

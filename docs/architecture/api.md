@@ -129,6 +129,8 @@ REST поверх NestJS, префикс `/v1`, OpenAPI/Swagger генериру
 | `PUT /v1/habits/:id/entries/:date`    | `{ value }` (check: 0 или 1; number: 0..targetValue*2) — идемпотентно    |
 | `DELETE /v1/habits/:id/entries/:date` | убрать чек-ин за день                                                    |
 
+`targetValue` (1..1000) обязателен для `type: 'number'` и запрещён для `'check'` (create-схема и merge-проверка в PATCH, как пара rrule/dueDate из M4). `daysOfWeek` — битовая маска 1..127 (бит 0 = понедельник, 127 = все дни, дефолт). Отметка за будущий день или по архивной привычке → 400; активную привычку удалить нельзя (сначала `archived: true`). Окно вхождений `GET /v1/habits` — `[today-59, today]` в TZ пользователя; стрики и календарь считает клиент общей функцией `packages/shared/src/lib/habit.ts`.
+
 ## Health
 
 | Метод и путь     | Назначение                                                                                 |

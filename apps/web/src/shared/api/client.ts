@@ -59,6 +59,9 @@ export const apiClient = {
   patch<T>(path: string, schema: z.ZodType<T>, body: unknown): Promise<T> {
     return request(path, schema, { method: "PATCH", body: JSON.stringify(body) });
   },
+  put<T>(path: string, schema: z.ZodType<T>, body: unknown): Promise<T> {
+    return request(path, schema, { method: "PUT", body: JSON.stringify(body) });
+  },
   /** Для эндпоинтов без содержимого в ответе. */
   async postVoid(path: string, body: unknown): Promise<void> {
     await request(path, z.unknown(), { method: "POST", body: JSON.stringify(body) });

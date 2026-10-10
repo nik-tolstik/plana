@@ -425,6 +425,229 @@ a {
   color: var(--muted);
 }
 
+/* --- Привычки (M6) --- */
+
+.habits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.habit-month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+.habit-month-nav span {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.habit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.habit-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.habit-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.habit-name {
+  margin: 0;
+  font-size: 15px;
+}
+
+.habit-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.habit-streak {
+  margin-left: auto;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.habit-today {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+}
+
+.habit-check {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.habit-check.checked {
+  background: var(--fg);
+  border-color: var(--fg);
+}
+
+.habit-counter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+}
+
+.habit-counter button {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  padding: 0;
+  font-size: 16px;
+}
+
+.habit-counter .done {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.habit-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.habit-dow {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.habit-day {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  padding: 0;
+  font-size: 12px;
+  color: var(--muted);
+  background: none;
+}
+
+.habit-day.done {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #fff;
+}
+
+.habit-day.partial {
+  border-color: #22c55e;
+  color: var(--fg);
+}
+
+.habit-day.off:not(.done) {
+  border-style: dotted;
+}
+
+.habit-day.future {
+  opacity: 0.35;
+}
+
+.habit-day.today:not(.done) {
+  border-color: var(--fg);
+  border-width: 2px;
+}
+
+.habit-day.clickable {
+  cursor: pointer;
+}
+
+.habit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.habit-form-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.habit-form-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.habit-form-days {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.habit-day-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.habit-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.habits-archived {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+.habits-archived-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+  padding: 4px 0;
+}
+
+.habits-archived-row span {
+  flex: 1;
+}
+
+.habits-archived-row button {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+}
+
+.habits-archived-row button:hover {
+  color: var(--fg);
+}
+
 /* --- Теги, поиск, drag&drop (M5) --- */
 
 .task-tags {
