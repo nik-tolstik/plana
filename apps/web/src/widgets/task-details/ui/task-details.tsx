@@ -1,6 +1,13 @@
 import { useState } from "react";
-import { TASK_PRIORITIES, TASK_PRIORITY_LABELS_RU, type TaskDto } from "@plana/shared";
+import {
+  TASK_PRIORITIES,
+  TASK_PRIORITY_LABELS_RU,
+  rruleValueLabel,
+  todayInZone,
+  type TaskDto,
+} from "@plana/shared";
 import { useSectionsQuery, useSidebarQuery } from "@/entities/list";
+import { useUserTimezone } from "@/entities/task";
 import {
   useCompleteTask,
   useTrashTask,
@@ -14,6 +21,17 @@ interface TaskDetailsProps {
   onClose: () => void;
 }
 
+/** Пресеты повтора; value — каноническая RRULE-строка, "" = без повтора. */
+const REPEAT_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "", label: "Без повтора" },
+  { value: "FREQ=DAILY", label: "Каждый день" },
+  { value: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", label: "По будням" },
+  { value: "FREQ=WEEKLY;BYDAY=SA,SU", label: "По выходным" },
+  { value: "FREQ=WEEKLY", label: "Каждую неделю" },
+  { value: "FREQ=MONTHLY", label: "Каждый месяц" },
+  { value: "FREQ=YEARLY", label: "Каждый год" },
+];
+
 /** Правая панель редактирования задачи (desktop; на мобильном — поверх списка). */
 export function TaskDetails({ task, onClose }: TaskDetailsProps) {
   const sidebarQuery = useSidebarQuery();
@@ -21,6 +39,7 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
   const complete = useCompleteTask();
   const uncomplete = useUncompleteTask();
   const trash = useTrashTask();
+  const timezone = useUserTimezone();
 
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
@@ -30,6 +49,7 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
   const [pinned, setPinned] = useState(task.pinned);
   const [listId, setListId] = useState(task.listId);
   const [sectionId, setSectionId] = useState(task.sectionId ?? "");
+  const [rrule, setRrule] = useState(task.rrule ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -41,24 +61,34 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
     : [];
   const sections = sectionsQuery.data ?? [];
 
+  // Нестандартное правило (через api или quick-add) показываем отдельной опцией.
+  const repeatOptions =
+    rrule !== "" && !REPEAT_OPTIONS.some((option) => option.value === rrule)
+      ? [{ value: rrule, label: rruleValueLabel(rrule) }, ...REPEAT_OPTIONS]
+      : REPEAT_OPTIONS;
+
   async function save() {
     if (title.trim().length === 0) {
       setError("Название не может быть пустым");
       return;
     }
+    // Повтор требует даты: без явной даты отсчёт с сегодняшнего дня.
+    const effectiveDueDate =
+      dueDate === "" && rrule !== "" ? todayInZone(new Date(), timezone) : dueDate;
     try {
       await update.mutateAsync({
         taskId: task.id,
         title: title.trim(),
         description,
-        dueDate: dueDate === "" ? null : dueDate,
-        dueTime: dueDate === "" || dueTime === "" ? null : dueTime,
+        dueDate: effectiveDueDate === "" ? null : effectiveDueDate,
+        dueTime: effectiveDueDate === "" || dueTime === "" ? null : dueTime,
         priority,
         pinned,
         ...(listId !== task.listId ? { listId } : {}),
         ...(sectionId !== (task.sectionId ?? "")
           ? { sectionId: sectionId === "" ? null : sectionId }
           : {}),
+        ...(rrule !== (task.rrule ?? "") ? { rrule: rrule === "" ? null : rrule } : {}),
       });
       setError(null);
       setSaved(true);
@@ -75,6 +105,14 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
       } else {
         await uncomplete.mutateAsync(task.id);
       }
+    } catch (cause) {
+      setError(errorMessage(cause));
+    }
+  }
+
+  async function undoLastCompletion() {
+    try {
+      await uncomplete.mutateAsync(task.id);
     } catch (cause) {
       setError(errorMessage(cause));
     }
@@ -167,6 +205,17 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
         </select>
       </label>
 
+      <label className="details-field">
+        Повтор
+        <select value={rrule} onChange={(event) => setRrule(event.target.value)}>
+          {repeatOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
       <label className="details-check">
         <input
           type="checkbox"
@@ -188,9 +237,20 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
         >
           Сохранить
         </button>
-        <button className="btn" type="button" onClick={() => void toggleComplete()}>
-          {task.completedAt ? "Вернуть в работу" : "Завершить"}
-        </button>
+        {task.rrule === null ? (
+          <button className="btn" type="button" onClick={() => void toggleComplete()}>
+            {task.completedAt ? "Вернуть в работу" : "Завершить"}
+          </button>
+        ) : (
+          <>
+            <button className="btn" type="button" onClick={() => void toggleComplete()}>
+              Завершить вхождение
+            </button>
+            <button className="btn" type="button" onClick={() => void undoLastCompletion()}>
+              Отменить последнее завершение
+            </button>
+          </>
+        )}
         <button className="btn danger" type="button" onClick={() => void remove()}>
           В корзину
         </button>

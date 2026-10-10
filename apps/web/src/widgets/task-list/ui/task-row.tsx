@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { TaskDto } from "@plana/shared";
+import { rruleValueLabel, type TaskDto } from "@plana/shared";
 import {
   useCompleteTask,
   useRestoreTask,
@@ -81,6 +81,11 @@ export function TaskRow({ task, today, showOverdue = true, onOpenDetails }: Task
         {task.pinned && <span title="Закреплено">📌</span>}
         {task.priority !== "none" && (
           <span title="Приоритет">{PRIORITY_FLAG[task.priority] ?? "⚑"}</span>
+        )}
+        {task.rrule !== null && (
+          <span className="task-repeat" title={rruleValueLabel(task.rrule)}>
+            ↻
+          </span>
         )}
         {dueLabel && <span className={overdue ? "task-due overdue" : "task-due"}>{dueLabel}</span>}
         <button

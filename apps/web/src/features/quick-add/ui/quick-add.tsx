@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { parseQuickAdd, TASK_PRIORITY_LABELS_RU } from "@plana/shared";
+import { parseQuickAdd, rruleValueLabel, TASK_PRIORITY_LABELS_RU } from "@plana/shared";
 import { useUserTimezone } from "@/entities/task";
 import { useCreateTask } from "@/features/task-manage";
 import { errorMessage } from "@/shared/lib/error-message";
@@ -32,6 +32,7 @@ export function QuickAdd({ defaultListId }: QuickAddProps) {
         title: parsed.title,
         dueDate: parsed.dueDate ?? undefined,
         dueTime: parsed.dueTime ?? undefined,
+        rrule: parsed.rrule ?? undefined,
         priority: parsed.priority === "none" ? undefined : parsed.priority,
         listId: defaultListId,
       });
@@ -45,6 +46,7 @@ export function QuickAdd({ defaultListId }: QuickAddProps) {
   const chips: string[] = [];
   if (parsed?.dueDate) chips.push(parsed.dueDate.split("-").reverse().join("."));
   if (parsed?.dueTime) chips.push(parsed.dueTime);
+  if (parsed?.rrule) chips.push(`↻ ${rruleValueLabel(parsed.rrule)}`);
   if (parsed && parsed.priority !== "none") chips.push(TASK_PRIORITY_LABELS_RU[parsed.priority]);
 
   return (

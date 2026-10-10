@@ -66,6 +66,29 @@ describe("createTaskSchema", () => {
     expect(() => createTaskSchema.parse({ title: "Созвон", dueTime: "11:00" })).toThrow();
   });
 
+  it("повтор: валидная RRULE-строка проходит, требует дату", () => {
+    const dto = createTaskSchema.parse({
+      title: "Зарядка",
+      dueDate: "2026-10-10",
+      rrule: "FREQ=DAILY",
+    });
+    expect(dto.rrule).toBe("FREQ=DAILY");
+    expect(() => createTaskSchema.parse({ title: "Зарядка", rrule: "FREQ=DAILY" })).toThrow();
+  });
+
+  it("повтор: мусорная RRULE отклоняется", () => {
+    expect(() =>
+      createTaskSchema.parse({ title: "Зарядка", dueDate: "2026-10-10", rrule: "FREQ=HOURLY" }),
+    ).toThrow();
+    expect(() =>
+      createTaskSchema.parse({
+        title: "Зарядка",
+        dueDate: "2026-10-10",
+        rrule: "FREQ=MONTHLY;BYDAY=MO",
+      }),
+    ).toThrow();
+  });
+
   it("несуществующая дата отклоняется", () => {
     expect(() => createTaskSchema.parse({ title: "Созвон", dueDate: "2026-02-30" })).toThrow();
   });

@@ -10,7 +10,14 @@ import type {
   TaskListDto,
   TasksQuery,
 } from "@plana/shared";
-import { addDays, parseQuickAdd, todayInZone } from "@plana/shared";
+import {
+  addDays,
+  compareDays,
+  nextOccurrence,
+  parseQuickAdd,
+  parseRrule,
+  todayInZone,
+} from "@plana/shared";
 import {
   and,
   asc,
@@ -27,7 +34,7 @@ import {
 } from "drizzle-orm";
 import { DB } from "../../db/database.module";
 import type { Db } from "../../db/drizzle";
-import { lists, sections, subtasks, tasks, users } from "../../db/schema";
+import { lists, sections, subtasks, taskCompletions, tasks, users } from "../../db/schema";
 import { POSITION_STEP } from "../lists/lists.service";
 
 export type TaskRow = typeof tasks.$inferSelect;
@@ -43,6 +50,8 @@ export function toTaskDto(row: TaskRow, taskSubtasks: SubtaskRow[]): TaskDto {
     priority: row.priority,
     dueDate: row.dueDate,
     dueTime: row.dueTime,
+    rrule: row.rrule,
+    rruleStartDate: row.rruleStartDate,
     pinned: row.pinned,
     position: row.position,
     completedAt: row.completedAt?.toISOString() ?? null,
@@ -171,6 +180,9 @@ export class TasksService {
         priority: dto.priority ?? "none",
         dueDate: dto.dueDate ?? null,
         dueTime: dto.dueTime ?? null,
+        // Схема гарантирует: rrule только вместе с dueDate (DTSTART = dueDate).
+        rrule: dto.rrule ?? null,
+        rruleStartDate: dto.rrule != null ? (dto.dueDate ?? null) : null,
         pinned: dto.pinned ?? false,
         position,
       })
@@ -308,6 +320,10 @@ export class TasksService {
     if (dueTime !== null && dueDate === null) {
       throw new BadRequestException({ description: "Время имеет смысл только вместе с датой" });
     }
+    const rrule = dto.rrule !== undefined ? dto.rrule : task.rrule;
+    if (rrule !== null && dueDate === null) {
+      throw new BadRequestException({ description: "Повтор имеет смысл только вместе с датой" });
+    }
 
     const values: Partial<typeof tasks.$inferInsert> = { updatedAt: new Date() };
     if (dto.title !== undefined) values.title = dto.title;
@@ -318,6 +334,23 @@ export class TasksService {
     if (dto.pinned !== undefined) values.pinned = dto.pinned;
     if (dto.listId !== undefined) values.listId = listId;
     if (dto.sectionId !== undefined) values.sectionId = sectionId;
+
+    // Повтор: смена правила или даты перезапускает шаблон с новой даты
+    // (rruleStartDate = dueDate), история вхождений сбрасывается; снятие
+    // повтора удаляет и якорь, и историю.
+    const ruleChanged = dto.rrule !== undefined && dto.rrule !== task.rrule;
+    const dateChanged = dto.dueDate !== undefined && dto.dueDate !== task.dueDate;
+    if (ruleChanged || (task.rrule !== null && dateChanged)) {
+      if (rrule === null) {
+        values.rrule = null;
+        values.rruleStartDate = null;
+      } else {
+        const reAnchor = ruleChanged || dateChanged || task.rruleStartDate === null;
+        values.rrule = rrule;
+        values.rruleStartDate = reAnchor ? dueDate : task.rruleStartDate;
+      }
+      await this.db.delete(taskCompletions).where(eq(taskCompletions.taskId, taskId));
+    }
 
     const containerChanged = listId !== task.listId || sectionId !== task.sectionId;
     const requestedPosition = dto.position;
@@ -388,6 +421,9 @@ export class TasksService {
     if (task.completedAt !== null) {
       return this.attachSubtasks(task);
     }
+    if (task.rrule !== null) {
+      return this.completeOccurrence(userId, task);
+    }
     const [updated] = await this.db
       .update(tasks)
       .set({ completedAt: new Date(), updatedAt: new Date() })
@@ -396,8 +432,67 @@ export class TasksService {
     return this.attachSubtasks(updated!);
   }
 
+  /**
+   * Завершение вхождения повтора: запись в task_completions + сдвиг dueDate
+   * на следующее вхождение. Просроченные вхождения пропускаются — следующее
+   * вхождение ищется после max(dueDate, сегодня), поведение TickTick.
+   * Правило исчерпано (COUNT/UNTIL) — задача закрывается обычным образом.
+   * НЕ идемпотентно: каждый вызов закрывает одно вхождение.
+   */
+  private async completeOccurrence(userId: string, task: TaskRow): Promise<TaskDto> {
+    const rule = parseRrule(task.rrule!);
+    if (rule === null || task.dueDate === null || task.rruleStartDate === null) {
+      // Правило валидируется схемой при записи — сюда попадаем только при
+      // битых данных (например, правках напрямую в БД).
+      throw new BadRequestException({ description: "Правило повтора повреждено" });
+    }
+    const timezone = await this.getTimezone(userId);
+    const today = todayInZone(new Date(), timezone);
+    const from = compareDays(task.dueDate, today) >= 0 ? task.dueDate : today;
+    const next = nextOccurrence(rule, task.rruleStartDate, from);
+
+    const [updated] = await this.db.transaction(async (tx) => {
+      await tx.insert(taskCompletions).values({
+        taskId: task.id,
+        userId,
+        occurrenceDate: task.dueDate!,
+      });
+      return tx
+        .update(tasks)
+        .set(
+          next === null
+            ? { completedAt: new Date(), updatedAt: new Date() }
+            : { dueDate: next, updatedAt: new Date() },
+        )
+        .where(eq(tasks.id, task.id))
+        .returning();
+    });
+    return this.attachSubtasks(updated!);
+  }
+
   async uncomplete(userId: string, taskId: string): Promise<TaskDto> {
     const task = await this.findOwned(userId, taskId);
+    if (task.rrule !== null) {
+      // Откат последнего вхождения: dueDate = закрытый день, запись истории удаляется.
+      const [last] = await this.db
+        .select()
+        .from(taskCompletions)
+        .where(eq(taskCompletions.taskId, taskId))
+        .orderBy(desc(taskCompletions.completedAt))
+        .limit(1);
+      if (!last) {
+        return this.attachSubtasks(task);
+      }
+      const [updated] = await this.db.transaction(async (tx) => {
+        await tx.delete(taskCompletions).where(eq(taskCompletions.id, last.id));
+        return tx
+          .update(tasks)
+          .set({ dueDate: last.occurrenceDate, completedAt: null, updatedAt: new Date() })
+          .where(eq(tasks.id, taskId))
+          .returning();
+      });
+      return this.attachSubtasks(updated!);
+    }
     if (task.completedAt === null) {
       return this.attachSubtasks(task);
     }

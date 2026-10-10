@@ -420,6 +420,11 @@ a {
   color: #dc2626;
 }
 
+.task-repeat {
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .task-subtasks-toggle {
   font-size: 12px;
   color: var(--muted);

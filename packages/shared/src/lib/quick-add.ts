@@ -2,11 +2,13 @@ import {
   compareDays,
   addDays,
   addMonths,
+  dayOfWeek,
   isValidDay,
   nextWeekday,
   timeInZone,
   todayInZone,
 } from "./date-day.js";
+import { formatRrule, type RruleRule } from "./rrule.js";
 import { taskPrioritySchema, type TaskPriority } from "../schemas/task.js";
 
 /**
@@ -16,11 +18,13 @@ import { taskPrioritySchema, type TaskPriority } from "../schemas/task.js";
  *
  * Распознаваемые токены удаляются из заголовка:
  * - приоритет: «!» / «!!» / «!!!» отдельным словом
+ * - повтор: «ежедневно», «по будням», «каждый день», «каждые 2 недели»…
  * - дата: сегодня / завтра / послезавтра, «через N дней/недель», «через месяц»,
  *   «в пн…в вс» (полные и краткие названия), «25 декабря» / «25 дек»,
  *   дд.мм(.гггг|гг), ISO yyyy-mm-dd
  * - время: «17:30», «в 17» (часы 0–23; время без даты → сегодня или завтра)
  * Дата без года в прошлом → следующий год (поведение TickTick).
+ * Повтор без даты → сегодня (шаблон начинается с сегодняшнего дня).
  */
 
 export interface QuickAddContext {
@@ -35,6 +39,7 @@ export interface ParsedQuickAdd {
   dueDate: string | null;
   /** HH:MM; сервер хранит HH:MM:SS. */
   dueTime: string | null;
+  rrule: string | null;
   priority: TaskPriority;
 }
 
@@ -73,6 +78,90 @@ const MONTH_PATTERN = Object.entries(MONTHS)
 const FULL_TIME_RE = /(?:^|\s)(?:в\s+)?(\d{1,2})[:.](\d{2})(?=\s|$)/i;
 const BARE_HOUR_RE = /(?:^|\s)в\s+(\d{1,2})(?=\s|$)/i;
 const PRIORITY_RE = /(?:^|\s)(!{1,3})(?=\s|$)/;
+
+function baseRule(freq: RruleRule["freq"], byDay: number[] = [], interval = 1): RruleRule {
+  return { freq, interval, byDay, count: null, until: null };
+}
+
+// Простые повторы одним словом/фразой.
+const SIMPLE_REPEATS: Array<{ re: RegExp; rule: RruleRule }> = [
+  { re: /(?:^|\s)ежедневно(?=\s|$)/i, rule: baseRule("DAILY") },
+  { re: /(?:^|\s)по\s+будням(?=\s|$)/i, rule: baseRule("WEEKLY", [0, 1, 2, 3, 4]) },
+  { re: /(?:^|\s)по\s+выходным(?=\s|$)/i, rule: baseRule("WEEKLY", [5, 6]) },
+  { re: /(?:^|\s)еженедельно(?=\s|$)/i, rule: baseRule("WEEKLY") },
+  { re: /(?:^|\s)ежемесячно(?=\s|$)/i, rule: baseRule("MONTHLY") },
+  { re: /(?:^|\s)ежегодно(?=\s|$)/i, rule: baseRule("YEARLY") },
+];
+
+// «каждый день», «каждую неделю», «каждые 2 недели», «каждые 3 месяца»…
+const EVERY_REPEAT_RE =
+  /(?:^|\s)кажд(?:ый|ую|ое|ые|ых)\s+(?:(\d{1,2})\s+)?(день|дня|дней|недел[ьюияе][ьяиоею]*|месяц[а-яё]*|год[а-яё]*|лет)(?=\s|$)/i;
+
+/**
+ * Первый день >= today, попадающий в byDay (для WEEKLY-шаблонов: якорем
+ * повтора должен быть день шаблона, иначе dueDate — не вхождение).
+ */
+function firstByDayFrom(today: string, byDay: number[]): string {
+  if (byDay.includes(dayOfWeek(today))) return today;
+  let best: string | null = null;
+  for (const dow of byDay) {
+    const candidate = nextWeekday(today, dow);
+    if (best === null || candidate < best) best = candidate;
+  }
+  return best ?? today;
+}
+
+interface RepeatResult {
+  text: string;
+  rrule: string | null;
+  /** Якорь повтора, если дата не указана явно; null = сегодня. */
+  anchor: string | null;
+}
+
+function parseRepeat(text: string, today: string): RepeatResult {
+  for (const { re, rule } of SIMPLE_REPEATS) {
+    const match = text.match(re);
+    if (match) {
+      const anchor = rule.byDay.length > 0 ? firstByDayFrom(today, rule.byDay) : null;
+      return { text: cutOut(text, match), rrule: formatRrule(rule), anchor };
+    }
+  }
+  const match = text.match(EVERY_REPEAT_RE);
+  if (match && match[2] !== undefined) {
+    const amount = match[1] ? Number(match[1]) : 1;
+    if (amount >= 1 && amount <= 52) {
+      const unit = match[2].toLowerCase();
+      const freq: RruleRule["freq"] = unit.startsWith("д")
+        ? "DAILY"
+        : unit.startsWith("н")
+          ? "WEEKLY"
+          : unit.startsWith("м")
+            ? "MONTHLY"
+            : "YEARLY";
+      return {
+        text: cutOut(text, match),
+        rrule: formatRrule(baseRule(freq, [], amount)),
+        anchor: null,
+      };
+    }
+  }
+
+  // «каждую пятницу», «каждый пн» — недельный повтор в этот день недели.
+  for (const weekday of WEEKDAYS) {
+    const weekdayMatch = text.match(
+      new RegExp(`(?:^|\\s)кажд(?:ый|ую|ое|ые|ых)\\s+(${weekday.pattern})(?=\\s|$)`, "i"),
+    );
+    if (weekdayMatch) {
+      const byDay = [weekday.dow];
+      return {
+        text: cutOut(text, weekdayMatch),
+        rrule: formatRrule(baseRule("WEEKLY", byDay)),
+        anchor: firstByDayFrom(today, byDay),
+      };
+    }
+  }
+  return { text, rrule: null, anchor: null };
+}
 
 function pad2(value: number): string {
   return String(value).padStart(2, "0");
@@ -215,11 +304,13 @@ export function parseQuickAdd(input: string, context: QuickAddContext): ParsedQu
 
   let text = input.trim();
   if (text.length === 0) {
-    return { title: "", dueDate: null, dueTime: null, priority: "none" };
+    return { title: "", dueDate: null, dueTime: null, rrule: null, priority: "none" };
   }
 
   const priorityResult = parsePriority(text);
   text = priorityResult.text;
+  const repeatResult = parseRepeat(text, today);
+  text = repeatResult.text;
   const dateResult = parseDate(text, today, currentYear);
   text = dateResult.text;
   const timeResult = parseTime(text);
@@ -228,7 +319,7 @@ export function parseQuickAdd(input: string, context: QuickAddContext): ParsedQu
   const title = collapseSpaces(text);
   if (title.length === 0) {
     // Вся строка распозналась как атрибуты — возвращаем как есть, без разбора.
-    return { title: input.trim(), dueDate: null, dueTime: null, priority: "none" };
+    return { title: input.trim(), dueDate: null, dueTime: null, rrule: null, priority: "none" };
   }
 
   let dueDate = dateResult.date;
@@ -238,11 +329,17 @@ export function parseQuickAdd(input: string, context: QuickAddContext): ParsedQu
     const nowTime = timeInZone(context.now, context.timeZone);
     dueDate = dueTime > nowTime ? today : addDays(today, 1);
   }
+  // Повтор без даты начинается сегодня (даже если время уже прошло);
+  // для WEEKLY;BYDAY якорь — первый день шаблона от сегодняшнего.
+  if (repeatResult.rrule !== null && dateResult.date === null) {
+    dueDate = repeatResult.anchor ?? today;
+  }
 
   return {
     title,
     dueDate,
     dueTime,
+    rrule: repeatResult.rrule,
     priority: taskPrioritySchema.parse(priorityResult.priority),
   };
 }

@@ -174,6 +174,7 @@ describe("задачи: CRUD, подзадачи, умные списки, quick
       title: "Созвон",
       dueDate: tomorrow,
       dueTime: "17:00",
+      rrule: null,
       priority: "medium",
     });
   });

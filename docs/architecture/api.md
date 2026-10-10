@@ -95,6 +95,12 @@ REST поверх NestJS, префикс `/v1`, OpenAPI/Swagger генериру
 
 Теги на задаче ставятся через `PATCH /v1/tasks/:id` (`tagIds`); несуществующие имена создаются неявно.
 
+### Повторы (RRULE, M4)
+
+Поддерживаемое подмножество RFC 5545 (без DTSTART — он в `rruleStartDate`, при создании = `dueDate`): `FREQ=DAILY|WEEKLY|MONTHLY|YEARLY`, `INTERVAL=1..52`, `BYDAY` (только WEEKLY, коды MO…SU), `COUNT=1..999` (включая первое вхождение), `UNTIL=YYYY-MM-DD` (включительно). `COUNT` и `UNTIL` взаимоисключающие. Движок — `packages/shared/src/lib/rrule.ts`, работает на календарных днях (см. decisions.md, часть 7).
+
+Семантика: `dueDate/dueTime` всегда следующее вхождение. Завершение повторяющейся задачи — запись в `task_completions` + сдвиг `dueDate` на первое вхождение после `max(dueDate, сегодня)` (просроченные вхождения пропускаются); правило исчерпано (COUNT/UNTIL) — задача закрывается через `completedAt`. Отмена (`uncomplete`) удаляет последнюю запись истории и возвращает `dueDate` к закрытому вхождению. Смена `rrule` или `dueDate` перезапускает шаблон (`rruleStartDate` = новая дата) и очищает историю. `rrule` без `dueDate` → 400 (create-схема и merge-проверка в PATCH).
+
 ## Вложения
 
 | Метод и путь                         | Назначение                                                                                                                                                                                         |

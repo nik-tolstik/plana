@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isValidDay } from "../lib/date-day.js";
+import { isValidRrule } from "../lib/rrule.js";
 
 /** Приоритет задачи. Порядок = возрастание важности. */
 export const TASK_PRIORITIES = ["none", "low", "medium", "high"] as const;
@@ -28,6 +29,12 @@ export const timeStringSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, "Время в формате HH:MM");
 
+/** RRULE-строка — подмножество RFC 5545 (lib/rrule), напр. `FREQ=WEEKLY;BYDAY=MO,WE`. */
+export const rruleSchema = z
+  .string()
+  .max(100)
+  .refine(isValidRrule, { message: "Некорректное правило повтора" });
+
 const titleSchema = z.string().trim().min(1, "Название не может быть пустым").max(500);
 const descriptionSchema = z.string().max(10_000);
 
@@ -54,6 +61,8 @@ export const taskSchema = z.object({
   priority: taskPrioritySchema,
   dueDate: dayStringSchema.nullable(),
   dueTime: timeStringSchema.nullable(),
+  rrule: rruleSchema.nullable(),
+  rruleStartDate: dayStringSchema.nullable(),
   pinned: z.boolean(),
   position: z.number().int(),
   completedAt: z.iso.datetime().nullable(),
@@ -114,6 +123,7 @@ export const createTaskSchema = z
     priority: taskPrioritySchema.optional(),
     dueDate: dayStringSchema.nullable().optional(),
     dueTime: timeStringSchema.nullable().optional(),
+    rrule: rruleSchema.nullable().optional(),
     listId: z.uuid().optional(),
     sectionId: z.uuid().nullable().optional(),
     pinned: z.boolean().optional(),
@@ -121,6 +131,10 @@ export const createTaskSchema = z
   .refine((dto) => dto.dueTime == null || dto.dueDate != null, {
     message: "Время имеет смысл только вместе с датой",
     path: ["dueTime"],
+  })
+  .refine((dto) => dto.rrule == null || dto.dueDate != null, {
+    message: "Повтор имеет смысл только вместе с датой",
+    path: ["rrule"],
   });
 
 export type CreateTaskDto = z.infer<typeof createTaskSchema>;
@@ -136,6 +150,7 @@ export const patchTaskSchema = z
     priority: taskPrioritySchema.optional(),
     dueDate: dayStringSchema.nullable().optional(),
     dueTime: timeStringSchema.nullable().optional(),
+    rrule: rruleSchema.nullable().optional(),
     listId: z.uuid().optional(),
     sectionId: z.uuid().nullable().optional(),
     pinned: z.boolean().optional(),
@@ -168,6 +183,7 @@ export const parsedQuickAddSchema = z.object({
   title: z.string(),
   dueDate: dayStringSchema.nullable(),
   dueTime: timeStringSchema.nullable(),
+  rrule: rruleSchema.nullable(),
   priority: taskPrioritySchema,
 });
 

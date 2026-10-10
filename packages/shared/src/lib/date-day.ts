@@ -98,3 +98,8 @@ export function nextWeekday(fromDay: string, target: number): string {
 export function compareDays(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
+
+/** Сколько суток от a до b (b позже — положительное). */
+export function daysBetween(a: string, b: string): number {
+  return Math.round((toUtcNoon(b).getTime() - toUtcNoon(a).getTime()) / 86_400_000);
+}

@@ -15,16 +15,29 @@ describe("parseQuickAdd: база", () => {
       title: "Купить хлеб",
       dueDate: null,
       dueTime: null,
+      rrule: null,
       priority: "none",
     });
   });
 
   it("пустая строка", () => {
-    expect(parse("   ")).toEqual({ title: "", dueDate: null, dueTime: null, priority: "none" });
+    expect(parse("   ")).toEqual({
+      title: "",
+      dueDate: null,
+      dueTime: null,
+      rrule: null,
+      priority: "none",
+    });
   });
 
   it("только атрибуты — строка возвращается как заголовок без разбора", () => {
-    expect(parse("!!!")).toEqual({ title: "!!!", dueDate: null, dueTime: null, priority: "none" });
+    expect(parse("!!!")).toEqual({
+      title: "!!!",
+      dueDate: null,
+      dueTime: null,
+      rrule: null,
+      priority: "none",
+    });
   });
 });
 
@@ -110,12 +123,14 @@ describe("parseQuickAdd: время", () => {
       title: "Встреча",
       dueDate: "2026-10-11",
       dueTime: "17:00",
+      rrule: null,
       priority: "none",
     });
     expect(parse("Встреча 17:30 завтра")).toEqual({
       title: "Встреча",
       dueDate: "2026-10-11",
       dueTime: "17:30",
+      rrule: null,
       priority: "none",
     });
   });
@@ -138,6 +153,7 @@ describe("parseQuickAdd: комбинации", () => {
       title: "Созвон с командой",
       dueDate: "2026-10-16",
       dueTime: "11:00",
+      rrule: null,
       priority: "medium",
     });
   });
@@ -150,5 +166,68 @@ describe("parseQuickAdd: комбинации", () => {
     // В UTC ещё 22:00 10-го — «в 23» не прошло, значит 10-е.
     const utc = parseQuickAdd("Встреча в 23", { now: lateEvening, timeZone: "UTC" });
     expect(utc.dueDate).toBe("2026-10-10");
+  });
+});
+
+describe("parseQuickAdd: повторы", () => {
+  it("простые слова-повторы", () => {
+    expect(parse("Полив цветов ежедневно")).toEqual({
+      title: "Полив цветов",
+      dueDate: "2026-10-10",
+      dueTime: null,
+      rrule: "FREQ=DAILY",
+      priority: "none",
+    });
+    expect(parse("Статус по будням").rrule).toBe("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR");
+    expect(parse("Уборка по выходным").rrule).toBe("FREQ=WEEKLY;BYDAY=SA,SU");
+    expect(parse("Отчёт еженедельно").rrule).toBe("FREQ=WEEKLY");
+    expect(parse("Инвентаризация ежемесячно").rrule).toBe("FREQ=MONTHLY");
+    expect(parse("Медосмотр ежегодно").rrule).toBe("FREQ=YEARLY");
+  });
+
+  it("«каждый/каждые N …»", () => {
+    expect(parse("Выписать корм каждый день").rrule).toBe("FREQ=DAILY");
+    expect(parse("Зарплата каждую неделю").rrule).toBe("FREQ=WEEKLY");
+    expect(parse("Стрижка каждые 2 недели").rrule).toBe("FREQ=WEEKLY;INTERVAL=2");
+    expect(parse("Аренда каждые 3 месяца").rrule).toBe("FREQ=MONTHLY;INTERVAL=3");
+    expect(parse("ТО каждые 2 года").rrule).toBe("FREQ=YEARLY;INTERVAL=2");
+  });
+
+  it("«каждую пятницу» — недельный повтор в день недели", () => {
+    const result = parse("Встреча каждую пятницу");
+    expect(result.rrule).toBe("FREQ=WEEKLY;BYDAY=FR");
+    expect(result.dueDate).toBe("2026-10-16"); // ближайшая пятница
+    expect(result.title).toBe("Встреча");
+  });
+
+  it("повтор без даты — сегодня, даже если время прошло", () => {
+    // now = 18:00; «в 17» без повтора дало бы завтра.
+    const result = parse("Зарядка каждый день в 17");
+    expect(result.dueDate).toBe("2026-10-10");
+    expect(result.dueTime).toBe("17:00");
+    expect(result.rrule).toBe("FREQ=DAILY");
+  });
+
+  it("повтор с явной датой — дата не переопределяется", () => {
+    const result = parse("Отчёт каждый месяц 25 декабря");
+    expect(result.dueDate).toBe("2026-12-25");
+    expect(result.rrule).toBe("FREQ=MONTHLY");
+  });
+
+  it("слово с корнем «кажд…» без единицы частоты — не повтор", () => {
+    expect(parse("Каждодневный отчёт").rrule).toBeNull();
+    expect(parse("Каждодневный отчёт").title).toBe("Каждодневный отчёт");
+  });
+});
+
+describe("parseQuickAdd: якорь WEEKLY;BYDAY без явной даты", () => {
+  it("«по будням» с субботы — первый якорь понедельник", () => {
+    const result = parse("Статус по будням");
+    expect(result.dueDate).toBe("2026-10-12");
+  });
+
+  it("«по выходным» с субботы — сегодня", () => {
+    const result = parse("Уборка по выходным");
+    expect(result.dueDate).toBe("2026-10-10");
   });
 });
