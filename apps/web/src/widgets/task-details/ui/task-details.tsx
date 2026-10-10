@@ -7,6 +7,7 @@ import {
   type TaskDto,
 } from "@plana/shared";
 import { useSectionsQuery, useSidebarQuery } from "@/entities/list";
+import { useTagsQuery } from "@/entities/tag";
 import { useUserTimezone } from "@/entities/task";
 import {
   useCompleteTask,
@@ -35,6 +36,7 @@ const REPEAT_OPTIONS: Array<{ value: string; label: string }> = [
 /** Правая панель редактирования задачи (desktop; на мобильном — поверх списка). */
 export function TaskDetails({ task, onClose }: TaskDetailsProps) {
   const sidebarQuery = useSidebarQuery();
+  const tagsQuery = useTagsQuery();
   const update = useUpdateTask();
   const complete = useCompleteTask();
   const uncomplete = useUncompleteTask();
@@ -50,6 +52,8 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
   const [listId, setListId] = useState(task.listId);
   const [sectionId, setSectionId] = useState(task.sectionId ?? "");
   const [rrule, setRrule] = useState(task.rrule ?? "");
+  const [tagNames, setTagNames] = useState<string[]>(task.tags.map((tag) => tag.name));
+  const [tagInput, setTagInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -66,6 +70,29 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
     rrule !== "" && !REPEAT_OPTIONS.some((option) => option.value === rrule)
       ? [{ value: rrule, label: rruleValueLabel(rrule) }, ...REPEAT_OPTIONS]
       : REPEAT_OPTIONS;
+
+  const tagsChanged =
+    [...tagNames].sort().join("\n") !==
+    task.tags
+      .map((tag) => tag.name)
+      .sort()
+      .join("\n");
+
+  function addTag(raw: string) {
+    const name = raw.trim().replace(/^#/, "");
+    if (name.length === 0) return;
+    if (tagNames.some((existing) => existing.toLowerCase() === name.toLowerCase())) {
+      setTagInput("");
+      return;
+    }
+    if (tagNames.length >= 20) {
+      setError("Максимум 20 тегов на задачу");
+      return;
+    }
+    setError(null);
+    setTagNames([...tagNames, name]);
+    setTagInput("");
+  }
 
   async function save() {
     if (title.trim().length === 0) {
@@ -89,6 +116,7 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
           ? { sectionId: sectionId === "" ? null : sectionId }
           : {}),
         ...(rrule !== (task.rrule ?? "") ? { rrule: rrule === "" ? null : rrule } : {}),
+        ...(tagsChanged ? { tagNames } : {}),
       });
       setError(null);
       setSaved(true);
@@ -215,6 +243,48 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
           ))}
         </select>
       </label>
+
+      <div className="details-field">
+        Теги
+        <div className="details-tags">
+          {tagNames.map((name) => (
+            <span className="tag-chip" key={name}>
+              #{name}
+              <button
+                aria-label={`Убрать тег ${name}`}
+                title="Убрать тег"
+                type="button"
+                onClick={() => setTagNames(tagNames.filter((tag) => tag !== name))}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+          <input
+            aria-label="Добавить тег"
+            list="tag-options"
+            placeholder="Добавить тег…"
+            value={tagInput}
+            onChange={(event) => setTagInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === ",") {
+                event.preventDefault();
+                addTag(tagInput);
+              }
+            }}
+            onBlur={() => addTag(tagInput)}
+          />
+          <datalist id="tag-options">
+            {(tagsQuery.data ?? [])
+              .filter(
+                (tag) => !tagNames.some((name) => name.toLowerCase() === tag.name.toLowerCase()),
+              )
+              .map((tag) => (
+                <option key={tag.id} value={tag.name} />
+              ))}
+          </datalist>
+        </div>
+      </div>
 
       <label className="details-check">
         <input

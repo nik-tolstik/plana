@@ -9,6 +9,7 @@ import {
 import { errorMessage } from "@/shared/lib/error-message";
 import { SubtasksBlock } from "./subtasks-block";
 import { taskDueLabel } from "../model/grouping";
+import type { TaskDragProps } from "../model/use-drag-reorder";
 
 const PRIORITY_FLAG: Record<string, string> = { low: "🚩", medium: "🔺", high: "🔴" };
 
@@ -18,9 +19,11 @@ interface TaskRowProps {
   /** Дата уже прошла — подсветить. */
   showOverdue?: boolean;
   onOpenDetails: (taskId: string) => void;
+  /** Перетаскивание (только страницы списков). */
+  dnd?: TaskDragProps;
 }
 
-export function TaskRow({ task, today, showOverdue = true, onOpenDetails }: TaskRowProps) {
+export function TaskRow({ task, today, showOverdue = true, onOpenDetails, dnd }: TaskRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const complete = useCompleteTask();
@@ -66,7 +69,21 @@ export function TaskRow({ task, today, showOverdue = true, onOpenDetails }: Task
   }
 
   return (
-    <li className={`task-row${task.completedAt ? " task-done" : ""}`}>
+    <li
+      className={[
+        "task-row",
+        task.completedAt ? "task-done" : "",
+        dnd?.draggingId === task.id ? "dragging" : "",
+        dnd?.overId === task.id && dnd.draggingId !== task.id ? "drop-before" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      draggable={dnd !== undefined}
+      onDragStart={dnd ? (event) => dnd.onDragStart(task, event) : undefined}
+      onDragOver={dnd ? (event) => dnd.onDragOver(task, event) : undefined}
+      onDrop={dnd ? (event) => dnd.onDrop(task, event) : undefined}
+      onDragEnd={dnd ? dnd.onDragEnd : undefined}
+    >
       <div className="task-line">
         <button
           aria-label={task.completedAt ? "Вернуть в работу" : "Завершить"}
@@ -78,6 +95,15 @@ export function TaskRow({ task, today, showOverdue = true, onOpenDetails }: Task
           {task.title}
         </button>
 
+        {task.tags.length > 0 && (
+          <span className="task-tags">
+            {task.tags.map((tag) => (
+              <span className="task-tag" key={tag.id}>
+                #{tag.name}
+              </span>
+            ))}
+          </span>
+        )}
         {task.pinned && <span title="Закреплено">📌</span>}
         {task.priority !== "none" && (
           <span title="Приоритет">{PRIORITY_FLAG[task.priority] ?? "⚑"}</span>

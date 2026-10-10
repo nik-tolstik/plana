@@ -16,6 +16,7 @@ describe("parseQuickAdd: база", () => {
       dueDate: null,
       dueTime: null,
       rrule: null,
+      tags: [],
       priority: "none",
     });
   });
@@ -26,6 +27,7 @@ describe("parseQuickAdd: база", () => {
       dueDate: null,
       dueTime: null,
       rrule: null,
+      tags: [],
       priority: "none",
     });
   });
@@ -36,6 +38,7 @@ describe("parseQuickAdd: база", () => {
       dueDate: null,
       dueTime: null,
       rrule: null,
+      tags: [],
       priority: "none",
     });
   });
@@ -124,6 +127,7 @@ describe("parseQuickAdd: время", () => {
       dueDate: "2026-10-11",
       dueTime: "17:00",
       rrule: null,
+      tags: [],
       priority: "none",
     });
     expect(parse("Встреча 17:30 завтра")).toEqual({
@@ -131,6 +135,7 @@ describe("parseQuickAdd: время", () => {
       dueDate: "2026-10-11",
       dueTime: "17:30",
       rrule: null,
+      tags: [],
       priority: "none",
     });
   });
@@ -154,6 +159,7 @@ describe("parseQuickAdd: комбинации", () => {
       dueDate: "2026-10-16",
       dueTime: "11:00",
       rrule: null,
+      tags: [],
       priority: "medium",
     });
   });
@@ -176,6 +182,7 @@ describe("parseQuickAdd: повторы", () => {
       dueDate: "2026-10-10",
       dueTime: null,
       rrule: "FREQ=DAILY",
+      tags: [],
       priority: "none",
     });
     expect(parse("Статус по будням").rrule).toBe("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR");
@@ -229,5 +236,41 @@ describe("parseQuickAdd: якорь WEEKLY;BYDAY без явной даты", ()
   it("«по выходным» с субботы — сегодня", () => {
     const result = parse("Уборка по выходным");
     expect(result.dueDate).toBe("2026-10-10");
+  });
+});
+
+describe("parseQuickAdd: хештеги", () => {
+  it("вырезает теги из заголовка", () => {
+    expect(parse("Купить #хлеб и #молоко завтра")).toEqual({
+      title: "Купить и",
+      dueDate: "2026-10-11",
+      dueTime: null,
+      rrule: null,
+      tags: ["хлеб", "молоко"],
+      priority: "none",
+    });
+  });
+
+  it("дубликаты (без учёта регистра) не повторяются", () => {
+    const result = parse("Отчёт #работа #Работа");
+    expect(result.tags).toEqual(["работа"]);
+    expect(result.title).toBe("Отчёт");
+  });
+
+  it("дефис и подчёркивание в теге, # без букв — не тег", () => {
+    expect(parse("Таск #моё-лучшее_дело !").tags).toEqual(["моё-лучшее_дело"]);
+    expect(parse("Плюс-минус # 5").tags).toEqual([]);
+    expect(parse("Плюс-минус # 5").title).toBe("Плюс-минус # 5");
+  });
+
+  it("только тег во всей строке — возврат без разбора", () => {
+    expect(parse("#работа")).toEqual({
+      title: "#работа",
+      dueDate: null,
+      dueTime: null,
+      rrule: null,
+      tags: [],
+      priority: "none",
+    });
   });
 });

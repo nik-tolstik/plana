@@ -176,6 +176,7 @@ describe("задачи: CRUD, подзадачи, умные списки, quick
       dueTime: "17:00",
       rrule: null,
       priority: "medium",
+      tags: [],
     });
   });
 

@@ -6,8 +6,10 @@ import { HabitsPage } from "@/pages/habits";
 import { HomePage } from "@/pages/home";
 import { ListPage } from "@/pages/list";
 import { LoginPage } from "@/pages/login";
+import { SearchPage } from "@/pages/search";
 import { SettingsPage } from "@/pages/settings";
 import { SmartPage } from "@/pages/smart";
+import { TagPage } from "@/pages/tag";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const status = useSessionStore((state) => state.status);
@@ -45,6 +47,8 @@ export const router = createBrowserRouter([
       { path: "/all", element: <SmartPage smart="all" /> },
       { path: "/completed", element: <SmartPage smart="completed" /> },
       { path: "/trash", element: <SmartPage smart="trash" /> },
+      { path: "/search", element: <SearchPage /> },
+      { path: "/tag/:tagId", element: <TagPage /> },
       { path: "/habits", element: <HabitsPage /> },
       { path: "/settings", element: <SettingsPage /> },
     ],

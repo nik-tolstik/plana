@@ -1,15 +1,17 @@
 import { useState } from "react";
 import type { TaskGroup } from "../model/grouping";
+import type { TaskDragProps } from "../model/use-drag-reorder";
 import { TaskRow } from "./task-row";
 
 interface TaskGroupBlockProps {
   group: TaskGroup;
   today: string;
   onOpenDetails: (taskId: string) => void;
+  dnd?: TaskDragProps;
 }
 
 /** Сворачиваемая группа задач (дата или секция). */
-export function TaskGroupBlock({ group, today, onOpenDetails }: TaskGroupBlockProps) {
+export function TaskGroupBlock({ group, today, onOpenDetails, dnd }: TaskGroupBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -26,7 +28,13 @@ export function TaskGroupBlock({ group, today, onOpenDetails }: TaskGroupBlockPr
       {!collapsed && (
         <ul className="task-list">
           {group.tasks.map((task) => (
-            <TaskRow key={task.id} task={task} today={today} onOpenDetails={onOpenDetails} />
+            <TaskRow
+              key={task.id}
+              task={task}
+              today={today}
+              onOpenDetails={onOpenDetails}
+              dnd={dnd}
+            />
           ))}
         </ul>
       )}

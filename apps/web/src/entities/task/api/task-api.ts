@@ -10,12 +10,22 @@ import {
 } from "@plana/shared";
 import { apiClient } from "@/shared/api/client";
 
-export type TaskListFilter = { smart?: string; listId?: string; limit?: number };
+export type TaskListFilter = {
+  smart?: string;
+  listId?: string;
+  /** Поиск по заголовку и описанию (ilike). */
+  q?: string;
+  /** Только задачи с этим тегом. */
+  tagId?: string;
+  limit?: number;
+};
 
 function toQuery(filter: TaskListFilter): string {
   const params = new URLSearchParams();
   if (filter.smart) params.set("smart", filter.smart);
   if (filter.listId) params.set("listId", filter.listId);
+  if (filter.q) params.set("q", filter.q);
+  if (filter.tagId) params.set("tagId", filter.tagId);
   params.set("limit", String(filter.limit ?? 200));
   return params.toString();
 }

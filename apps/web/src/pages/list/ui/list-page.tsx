@@ -6,7 +6,7 @@ import { useTasksQuery, useUserTimezone } from "@/entities/task";
 import { useCreateSection } from "@/features/structure-manage";
 import { QuickAdd } from "@/features/quick-add";
 import { TaskDetails } from "@/widgets/task-details";
-import { groupBySections, TaskListView } from "@/widgets/task-list";
+import { groupBySections, TaskListView, useTaskDragReorder } from "@/widgets/task-list";
 
 export function ListPage() {
   const { listId } = useParams<{ listId: string }>();
@@ -34,6 +34,8 @@ export function ListPage() {
     () => groupBySections(tasks, sectionsQuery.data ?? []),
     [tasks, sectionsQuery.data],
   );
+  // Перетаскивание доступно только на страницах списков.
+  const dnd = useTaskDragReorder({ enabled: listId !== undefined, tasks });
   const detailsTask = tasks.find((task) => task.id === detailsTaskId);
 
   if (sidebar && !list) {
@@ -61,7 +63,7 @@ export function ListPage() {
         {tasksQuery.isPending && <p className="page-status">Загрузка…</p>}
         {tasksQuery.isError && <p className="page-error">Не удалось загрузить задачи</p>}
 
-        <TaskListView groups={groups} today={today} onOpenDetails={setDetailsTaskId} />
+        <TaskListView groups={groups} today={today} onOpenDetails={setDetailsTaskId} dnd={dnd} />
 
         {addingSection ? (
           <form

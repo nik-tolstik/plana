@@ -35,6 +35,8 @@ export function QuickAdd({ defaultListId }: QuickAddProps) {
         rrule: parsed.rrule ?? undefined,
         priority: parsed.priority === "none" ? undefined : parsed.priority,
         listId: defaultListId,
+        // Хештеги «#тег» из строки быстрого ввода.
+        tagNames: parsed.tags.length > 0 ? parsed.tags : undefined,
       });
       setText("");
       setError(null);
@@ -48,6 +50,7 @@ export function QuickAdd({ defaultListId }: QuickAddProps) {
   if (parsed?.dueTime) chips.push(parsed.dueTime);
   if (parsed?.rrule) chips.push(`↻ ${rruleValueLabel(parsed.rrule)}`);
   if (parsed && parsed.priority !== "none") chips.push(TASK_PRIORITY_LABELS_RU[parsed.priority]);
+  if (parsed) chips.push(...parsed.tags.map((tag) => `#${tag}`));
 
   return (
     <div className="quick-add">

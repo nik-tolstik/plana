@@ -12,6 +12,8 @@ import {
   Query,
 } from "@nestjs/common";
 import type {
+  BatchResultDto,
+  BatchTasksDto,
   CreateTaskDto,
   ParsedQuickAddDto,
   ParseQuickAddRequestDto,
@@ -21,6 +23,7 @@ import type {
   TasksQuery,
 } from "@plana/shared";
 import {
+  batchTasksSchema,
   createTaskSchema,
   parseQuickAddRequestSchema,
   patchTaskSchema,
@@ -56,6 +59,15 @@ export class TasksController {
     @Body(new ZodValidationPipe(parseQuickAddRequestSchema)) dto: ParseQuickAddRequestDto,
   ): Promise<ParsedQuickAddDto> {
     return this.tasksService.parse(userId, dto.text);
+  }
+
+  @Post("tasks/batch")
+  @HttpCode(200)
+  batch(
+    @CurrentUserId() userId: string,
+    @Body(new ZodValidationPipe(batchTasksSchema)) dto: BatchTasksDto,
+  ): Promise<BatchResultDto> {
+    return this.tasksService.batch(userId, dto);
   }
 
   @Get("tasks/:id")

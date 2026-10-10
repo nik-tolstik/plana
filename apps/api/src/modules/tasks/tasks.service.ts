@@ -1,5 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type {
+  BatchResultDto,
+  BatchTasksDto,
   CreateSubtaskDto,
   CreateTaskDto,
   ParsedQuickAddDto,
@@ -8,6 +10,7 @@ import type {
   SubtaskDto,
   TaskDto,
   TaskListDto,
+  TaskTagDto,
   TasksQuery,
 } from "@plana/shared";
 import {
@@ -25,23 +28,40 @@ import {
   desc,
   eq,
   gte,
+  ilike,
   inArray,
   isNotNull,
   isNull,
+  lt,
   lte,
   ne,
+  or,
   sql,
 } from "drizzle-orm";
 import { DB } from "../../db/database.module";
 import type { Db } from "../../db/drizzle";
-import { lists, sections, subtasks, taskCompletions, tasks, users } from "../../db/schema";
+import {
+  lists,
+  sections,
+  subtasks,
+  taskCompletions,
+  taskTags,
+  tags,
+  tasks,
+  users,
+} from "../../db/schema";
 import { POSITION_STEP } from "../lists/lists.service";
 
 export type TaskRow = typeof tasks.$inferSelect;
 export type SubtaskRow = typeof subtasks.$inferSelect;
+export type TagRow = typeof tags.$inferSelect;
 
-export function toTaskDto(row: TaskRow, taskSubtasks: SubtaskRow[]): TaskDto {
-  return {
+export function toTaskDto(
+  row: TaskRow,
+  taskSubtasks: SubtaskRow[],
+  taskTags: Array<Pick<TagRow, "id" | "name">>,
+): TaskDto {
+  const dto: TaskDto = {
     id: row.id,
     listId: row.listId,
     sectionId: row.sectionId,
@@ -59,7 +79,9 @@ export function toTaskDto(row: TaskRow, taskSubtasks: SubtaskRow[]): TaskDto {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     subtasks: taskSubtasks.map(toSubtaskDto),
+    tags: taskTags.map<TaskTagDto>((tag) => ({ id: tag.id, name: tag.name })),
   };
+  return dto;
 }
 
 export function toSubtaskDto(row: SubtaskRow): SubtaskDto {
@@ -72,6 +94,11 @@ export function toSubtaskDto(row: SubtaskRow): SubtaskDto {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+/** Экранирует LIKE-спецсимволы (%, _, \) для ilike-поиска. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 }
 
 @Injectable()
@@ -187,20 +214,25 @@ export class TasksService {
         position,
       })
       .returning();
-    return toTaskDto(created!, []);
+    if (dto.tagNames !== undefined && dto.tagNames.length > 0) {
+      await this.syncTaskTags(userId, created!.id, dto.tagNames);
+    }
+    return this.hydrateTask(created!);
   }
 
   async findOne(userId: string, taskId: string): Promise<TaskDto> {
     const task = await this.findOwned(userId, taskId);
-    const rows = await this.db
-      .select()
-      .from(subtasks)
-      .where(eq(subtasks.taskId, taskId))
-      .orderBy(asc(subtasks.position));
-    return toTaskDto(task, rows);
+    return this.hydrateTask(task);
   }
 
   async findMany(userId: string, query: TasksQuery): Promise<TaskListDto> {
+    // Lazy purge: при открытии корзины физически удаляем задачи старше 30 дней.
+    if ((query.smart ?? "all") === "trash") {
+      await this.db
+        .delete(tasks)
+        .where(and(eq(tasks.userId, userId), lt(tasks.trashedAt, sql`now() - interval '30 days'`)));
+    }
+
     const base = and(eq(tasks.userId, userId));
     let where = base;
     let orderBy = [desc(tasks.pinned), asc(tasks.dueDate), asc(tasks.createdAt)];
@@ -270,6 +302,25 @@ export class TasksService {
       }
     }
 
+    // Поиск по заголовку и описанию (ilike, спецсимволы % _ \ экранируются).
+    if (query.q !== undefined) {
+      const pattern = `%${escapeLike(query.q)}%`;
+      where = and(where, or(ilike(tasks.title, pattern), ilike(tasks.description, pattern)));
+    }
+    // Фильтр по тегу: подзапрос по task_tags. Чужой tagId просто даст пустой список.
+    if (query.tagId !== undefined) {
+      where = and(
+        where,
+        inArray(
+          tasks.id,
+          this.db
+            .select({ taskId: taskTags.taskId })
+            .from(taskTags)
+            .where(eq(taskTags.tagId, query.tagId)),
+        ),
+      );
+    }
+
     const rows = await this.db
       .select()
       .from(tasks)
@@ -298,7 +349,27 @@ export class TasksService {
       byTask.set(subtask.taskId, list);
     }
 
-    return { items: rows.map((row) => toTaskDto(row, byTask.get(row.id) ?? [])), total };
+    const tagRows = ids.length
+      ? await this.db
+          .select({ taskId: taskTags.taskId, id: tags.id, name: tags.name })
+          .from(taskTags)
+          .innerJoin(tags, eq(tags.id, taskTags.tagId))
+          .where(inArray(taskTags.taskId, ids))
+          .orderBy(asc(tags.name))
+      : [];
+    const tagsByTask = new Map<string, Array<{ id: string; name: string }>>();
+    for (const tag of tagRows) {
+      const list = tagsByTask.get(tag.taskId) ?? [];
+      list.push({ id: tag.id, name: tag.name });
+      tagsByTask.set(tag.taskId, list);
+    }
+
+    return {
+      items: rows.map((row) =>
+        toTaskDto(row, byTask.get(row.id) ?? [], tagsByTask.get(row.id) ?? []),
+      ),
+      total,
+    };
   }
 
   async update(userId: string, taskId: string, dto: PatchTaskDto): Promise<TaskDto> {
@@ -361,11 +432,14 @@ export class TasksService {
         .set(values)
         .where(eq(tasks.id, taskId))
         .returning();
-      return this.attachSubtasks(updated!);
+      if (dto.tagNames !== undefined) {
+        await this.syncTaskTags(userId, taskId, dto.tagNames);
+      }
+      return this.hydrateTask(updated!);
     }
 
     // Перенумеровываем соседей целевого контейнера; position = целевой индекс.
-    return this.db.transaction(async (tx) => {
+    const [updated] = await this.db.transaction(async (tx) => {
       const siblings = await tx
         .select({ id: tasks.id, position: tasks.position })
         .from(tasks)
@@ -390,18 +464,63 @@ export class TasksService {
         }
       }
 
-      const [updated] = await tx.update(tasks).set(values).where(eq(tasks.id, taskId)).returning();
-      return this.attachSubtasks(updated!);
+      return tx.update(tasks).set(values).where(eq(tasks.id, taskId)).returning();
     });
+    if (dto.tagNames !== undefined) {
+      await this.syncTaskTags(userId, taskId, dto.tagNames);
+    }
+    return this.hydrateTask(updated!);
   }
 
-  private async attachSubtasks(row: TaskRow): Promise<TaskDto> {
-    const rows = await this.db
+  /** Полная загрузка задачи для ответа: подзадачи + теги. */
+  private async hydrateTask(row: TaskRow): Promise<TaskDto> {
+    const subtaskRows = await this.db
       .select()
       .from(subtasks)
       .where(eq(subtasks.taskId, row.id))
       .orderBy(asc(subtasks.position));
-    return toTaskDto(row, rows);
+    const tagRows = await this.db
+      .select({ id: tags.id, name: tags.name })
+      .from(taskTags)
+      .innerJoin(tags, eq(tags.id, taskTags.tagId))
+      .where(eq(taskTags.taskId, row.id))
+      .orderBy(asc(tags.name));
+    return toTaskDto(row, subtaskRows, tagRows);
+  }
+
+  /**
+   * Полная замена тегов задачи по именам: отсутствующие теги создаются
+   * (неявное создание, lower(name) уникален в рамках пользователя),
+   * лишние связи снимаются. Пустой массив снимает все теги.
+   */
+  private async syncTaskTags(userId: string, taskId: string, names: string[]): Promise<void> {
+    const tagIds: string[] = [];
+    for (const name of names) {
+      const [existing] = await this.db
+        .select({ id: tags.id })
+        .from(tags)
+        .where(and(eq(tags.userId, userId), sql`lower(${tags.name}) = lower(${name})`))
+        .limit(1);
+      if (existing) {
+        tagIds.push(existing.id);
+        continue;
+      }
+      const [last] = await this.db
+        .select({ position: tags.position })
+        .from(tags)
+        .where(eq(tags.userId, userId))
+        .orderBy(desc(tags.position))
+        .limit(1);
+      const [created] = await this.db
+        .insert(tags)
+        .values({ userId, name, position: (last?.position ?? -POSITION_STEP) + POSITION_STEP })
+        .returning({ id: tags.id });
+      tagIds.push(created!.id);
+    }
+    await this.db.delete(taskTags).where(eq(taskTags.taskId, taskId));
+    if (tagIds.length > 0) {
+      await this.db.insert(taskTags).values(tagIds.map((tagId) => ({ taskId, tagId })));
+    }
   }
 
   /** Список должен существовать и принадлежать пользователю (404 иначе). */
@@ -419,7 +538,7 @@ export class TasksService {
   async complete(userId: string, taskId: string): Promise<TaskDto> {
     const task = await this.findOwned(userId, taskId);
     if (task.completedAt !== null) {
-      return this.attachSubtasks(task);
+      return this.hydrateTask(task);
     }
     if (task.rrule !== null) {
       return this.completeOccurrence(userId, task);
@@ -429,7 +548,7 @@ export class TasksService {
       .set({ completedAt: new Date(), updatedAt: new Date() })
       .where(eq(tasks.id, taskId))
       .returning();
-    return this.attachSubtasks(updated!);
+    return this.hydrateTask(updated!);
   }
 
   /**
@@ -467,7 +586,7 @@ export class TasksService {
         .where(eq(tasks.id, task.id))
         .returning();
     });
-    return this.attachSubtasks(updated!);
+    return this.hydrateTask(updated!);
   }
 
   async uncomplete(userId: string, taskId: string): Promise<TaskDto> {
@@ -481,7 +600,7 @@ export class TasksService {
         .orderBy(desc(taskCompletions.completedAt))
         .limit(1);
       if (!last) {
-        return this.attachSubtasks(task);
+        return this.hydrateTask(task);
       }
       const [updated] = await this.db.transaction(async (tx) => {
         await tx.delete(taskCompletions).where(eq(taskCompletions.id, last.id));
@@ -491,17 +610,17 @@ export class TasksService {
           .where(eq(tasks.id, taskId))
           .returning();
       });
-      return this.attachSubtasks(updated!);
+      return this.hydrateTask(updated!);
     }
     if (task.completedAt === null) {
-      return this.attachSubtasks(task);
+      return this.hydrateTask(task);
     }
     const [updated] = await this.db
       .update(tasks)
       .set({ completedAt: null, updatedAt: new Date() })
       .where(eq(tasks.id, taskId))
       .returning();
-    return this.attachSubtasks(updated!);
+    return this.hydrateTask(updated!);
   }
 
   async trash(userId: string, taskId: string): Promise<void> {
@@ -530,7 +649,81 @@ export class TasksService {
       .set({ trashedAt: null, updatedAt: new Date() })
       .where(eq(tasks.id, task.id))
       .returning();
-    return this.attachSubtasks(updated!);
+    return this.hydrateTask(updated!);
+  }
+
+  /**
+   * Массовые операции (POST /v1/tasks/batch). Чужие и несуществующие id
+   * пропускаются молча; возвращается число применённых задач.
+   */
+  async batch(userId: string, dto: BatchTasksDto): Promise<BatchResultDto> {
+    switch (dto.action) {
+      case "complete": {
+        // Повторы идут через completeOccurrence (сдвиг dueDate), поэтому по одной.
+        const rows = await this.db
+          .select({ id: tasks.id })
+          .from(tasks)
+          .where(
+            and(
+              inArray(tasks.id, dto.taskIds),
+              eq(tasks.userId, userId),
+              isNull(tasks.trashedAt),
+              isNull(tasks.completedAt),
+            ),
+          );
+        for (const row of rows) {
+          await this.complete(userId, row.id);
+        }
+        return { updated: rows.length };
+      }
+      case "trash": {
+        const updated = await this.db
+          .update(tasks)
+          .set({ trashedAt: new Date(), updatedAt: new Date() })
+          .where(
+            and(inArray(tasks.id, dto.taskIds), eq(tasks.userId, userId), isNull(tasks.trashedAt)),
+          )
+          .returning({ id: tasks.id });
+        return { updated: updated.length };
+      }
+      case "restore": {
+        const updated = await this.db
+          .update(tasks)
+          .set({ trashedAt: null, updatedAt: new Date() })
+          .where(
+            and(
+              inArray(tasks.id, dto.taskIds),
+              eq(tasks.userId, userId),
+              isNotNull(tasks.trashedAt),
+            ),
+          )
+          .returning({ id: tasks.id });
+        return { updated: updated.length };
+      }
+      case "move": {
+        const listId = dto.listId!;
+        await this.assertListOwned(userId, listId);
+        const sectionId = dto.sectionId ?? null;
+        if (sectionId !== null) {
+          await this.assertSectionInList(userId, sectionId, listId);
+        }
+        const movable = await this.db
+          .select({ id: tasks.id })
+          .from(tasks)
+          .where(
+            and(inArray(tasks.id, dto.taskIds), eq(tasks.userId, userId), isNull(tasks.trashedAt)),
+          );
+        let position = await this.nextPosition(listId, sectionId);
+        for (const row of movable) {
+          await this.db
+            .update(tasks)
+            .set({ listId, sectionId, position, updatedAt: new Date() })
+            .where(eq(tasks.id, row.id));
+          position += POSITION_STEP;
+        }
+        return { updated: movable.length };
+      }
+    }
   }
 
   /** NLP-разбор quick-add; ничего не создаёт (docs/architecture/api.md). */

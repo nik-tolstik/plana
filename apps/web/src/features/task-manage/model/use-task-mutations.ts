@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { taskKeys } from "@/entities/task";
+import { tagKeys } from "@/entities/tag";
 import {
   apiCompleteTask,
   apiCreateSubtask,
@@ -17,8 +18,18 @@ function useInvalidateTasks() {
   return () => queryClient.invalidateQueries({ queryKey: taskKeys.all });
 }
 
+/** Создание/обновление с tagNames может создать тег — инвалидируем и их. */
+function useInvalidateTasksAndTags() {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: taskKeys.all }),
+      queryClient.invalidateQueries({ queryKey: tagKeys.all }),
+    ]);
+}
+
 export function useCreateTask() {
-  const invalidate = useInvalidateTasks();
+  const invalidate = useInvalidateTasksAndTags();
   return useMutation({
     mutationFn: apiCreateTask,
     onSuccess: invalidate,
@@ -26,7 +37,7 @@ export function useCreateTask() {
 }
 
 export function useUpdateTask() {
-  const invalidate = useInvalidateTasks();
+  const invalidate = useInvalidateTasksAndTags();
   return useMutation({
     mutationFn: ({ taskId, ...input }: { taskId: string } & Parameters<typeof apiUpdateTask>[1]) =>
       apiUpdateTask(taskId, input),

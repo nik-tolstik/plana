@@ -3,4 +3,5 @@ export * from "./lib/quick-add.js";
 export * from "./lib/rrule.js";
 export * from "./schemas/auth.js";
 export * from "./schemas/structure.js";
+export * from "./schemas/tag.js";
 export * from "./schemas/task.js";

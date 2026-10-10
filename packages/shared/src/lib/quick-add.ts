@@ -23,6 +23,7 @@ import { taskPrioritySchema, type TaskPriority } from "../schemas/task.js";
  *   «в пн…в вс» (полные и краткие названия), «25 декабря» / «25 дек»,
  *   дд.мм(.гггг|гг), ISO yyyy-mm-dd
  * - время: «17:30», «в 17» (часы 0–23; время без даты → сегодня или завтра)
+ * - теги: «#хештег» (кириллица/латиница/цифры/-/_), вырезаются из заголовка
  * Дата без года в прошлом → следующий год (поведение TickTick).
  * Повтор без даты → сегодня (шаблон начинается с сегодняшнего дня).
  */
@@ -40,6 +41,8 @@ export interface ParsedQuickAdd {
   /** HH:MM; сервер хранит HH:MM:SS. */
   dueTime: string | null;
   rrule: string | null;
+  /** Имена тегов из «#хештегов»; создаются неявно при сохранении задачи. */
+  tags: string[];
   priority: TaskPriority;
 }
 
@@ -294,6 +297,25 @@ function parseDate(
   return { text, date: null };
 }
 
+// #хештег: буквы/цифры/-/_ (кириллица включена), 1..50 символов.
+const HASHTAG_RE = /(?:^|\s)#([а-яёa-z0-9_-]{1,50})(?=\s|$)/gi;
+
+/** Вырезает «#хештеги», возвращает чистый текст и уникальные имена тегов. */
+function parseHashtags(text: string): { text: string; tags: string[] } {
+  const tags: string[] = [];
+  let rest = text;
+  for (const match of text.matchAll(HASHTAG_RE)) {
+    const name = match[1];
+    if (name !== undefined) {
+      if (!tags.some((tag) => tag.toLowerCase() === name.toLowerCase())) {
+        tags.push(name);
+      }
+      rest = rest.replace(match[0], " ");
+    }
+  }
+  return { text: rest, tags };
+}
+
 /**
  * Разбирает строку быстрого ввода. Приоритет и даты вырезаются из заголовка;
  * если после вырезания заголовок пуст — возвращается исходная строка без разбора.
@@ -304,7 +326,7 @@ export function parseQuickAdd(input: string, context: QuickAddContext): ParsedQu
 
   let text = input.trim();
   if (text.length === 0) {
-    return { title: "", dueDate: null, dueTime: null, rrule: null, priority: "none" };
+    return { title: "", dueDate: null, dueTime: null, rrule: null, tags: [], priority: "none" };
   }
 
   const priorityResult = parsePriority(text);
@@ -315,11 +337,20 @@ export function parseQuickAdd(input: string, context: QuickAddContext): ParsedQu
   text = dateResult.text;
   const timeResult = parseTime(text);
   text = timeResult.text;
+  const hashtagResult = parseHashtags(text);
+  text = hashtagResult.text;
 
   const title = collapseSpaces(text);
   if (title.length === 0) {
     // Вся строка распозналась как атрибуты — возвращаем как есть, без разбора.
-    return { title: input.trim(), dueDate: null, dueTime: null, rrule: null, priority: "none" };
+    return {
+      title: input.trim(),
+      dueDate: null,
+      dueTime: null,
+      rrule: null,
+      tags: [],
+      priority: "none",
+    };
   }
 
   let dueDate = dateResult.date;
@@ -340,6 +371,7 @@ export function parseQuickAdd(input: string, context: QuickAddContext): ParsedQu
     dueDate,
     dueTime,
     rrule: repeatResult.rrule,
+    tags: hashtagResult.tags,
     priority: taskPrioritySchema.parse(priorityResult.priority),
   };
 }

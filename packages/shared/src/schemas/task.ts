@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isValidDay } from "../lib/date-day.js";
 import { isValidRrule } from "../lib/rrule.js";
+import { tagNameSchema, taskTagSchema } from "./tag.js";
 
 /** Приоритет задачи. Порядок = возрастание важности. */
 export const TASK_PRIORITIES = ["none", "low", "medium", "high"] as const;
@@ -70,6 +71,7 @@ export const taskSchema = z.object({
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   subtasks: z.array(subtaskSchema),
+  tags: z.array(taskTagSchema),
 });
 
 export type TaskDto = z.infer<typeof taskSchema>;
@@ -104,6 +106,10 @@ export const tasksQuerySchema = z
   .object({
     smart: smartListSchema.optional(),
     listId: z.uuid().optional(),
+    /** Поиск ILIKE по названию и описанию (pg_trgm). */
+    q: z.string().trim().min(1).max(100).optional(),
+    /** Только задачи с этим тегом. */
+    tagId: z.uuid().optional(),
     limit: z.coerce.number().int().min(1).max(200).default(50),
     offset: z.coerce.number().int().min(0).default(0),
   })
@@ -116,6 +122,14 @@ export type TasksQuery = z.infer<typeof tasksQuerySchema>;
 
 // --- Запросы ---
 
+/** Полная замена тегов задачи; несуществующие имена создаются неявно. */
+const tagNamesSchema = z
+  .array(tagNameSchema)
+  .max(20, "Не больше 20 тегов")
+  .refine((names) => new Set(names.map((name) => name.toLowerCase())).size === names.length, {
+    message: "Дубликаты тегов",
+  });
+
 export const createTaskSchema = z
   .object({
     title: titleSchema,
@@ -124,6 +138,7 @@ export const createTaskSchema = z
     dueDate: dayStringSchema.nullable().optional(),
     dueTime: timeStringSchema.nullable().optional(),
     rrule: rruleSchema.nullable().optional(),
+    tagNames: tagNamesSchema.optional(),
     listId: z.uuid().optional(),
     sectionId: z.uuid().nullable().optional(),
     pinned: z.boolean().optional(),
@@ -151,6 +166,7 @@ export const patchTaskSchema = z
     dueDate: dayStringSchema.nullable().optional(),
     dueTime: timeStringSchema.nullable().optional(),
     rrule: rruleSchema.nullable().optional(),
+    tagNames: tagNamesSchema.optional(),
     listId: z.uuid().optional(),
     sectionId: z.uuid().nullable().optional(),
     pinned: z.boolean().optional(),
@@ -185,6 +201,7 @@ export const parsedQuickAddSchema = z.object({
   dueTime: timeStringSchema.nullable(),
   rrule: rruleSchema.nullable(),
   priority: taskPrioritySchema,
+  tags: z.array(z.string()),
 });
 
 export type ParsedQuickAddDto = z.infer<typeof parsedQuickAddSchema>;

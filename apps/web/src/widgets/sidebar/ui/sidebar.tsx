@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router";
 import { useSidebarQuery } from "@/entities/list";
+import { useTagsQuery } from "@/entities/tag";
 import { logout } from "@/features/auth";
 import { useCreateFolder, useCreateList } from "@/features/structure-manage";
 import { errorMessage } from "@/shared/lib/error-message";
@@ -23,16 +24,19 @@ const SMART_EXTRA: Array<{ to: string; label: string }> = [
 
 export function Sidebar() {
   const sidebarQuery = useSidebarQuery();
+  const tagsQuery = useTagsQuery();
   const navigate = useNavigate();
 
   const createList = useCreateList();
   const createFolder = useCreateFolder();
 
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [addingList, setAddingList] = useState(false);
   const [addingFolder, setAddingFolder] = useState(false);
 
   const sidebar = sidebarQuery.data;
+  const tags = tagsQuery.data ?? [];
 
   async function addList(name: string) {
     try {
@@ -60,6 +64,22 @@ export function Sidebar() {
       <Link className="sidebar-brand" to="/">
         Plana
       </Link>
+
+      <form
+        className="sidebar-search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const q = search.trim();
+          navigate(q.length > 0 ? `/search?q=${encodeURIComponent(q)}` : "/search");
+        }}
+      >
+        <input
+          aria-label="Поиск задач"
+          placeholder="Поиск…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </form>
 
       <nav aria-label="Списки">
         {sidebar && (
@@ -132,6 +152,20 @@ export function Sidebar() {
             </button>
           )}
         </div>
+
+        {tags.length > 0 && (
+          <div className="sidebar-section sidebar-tags">
+            {tags.map((tag) => (
+              <NavLink
+                className={({ isActive }) => `row row-link${isActive ? " row-active" : ""}`}
+                key={tag.id}
+                to={`/tag/${tag.id}`}
+              >
+                #{tag.name}
+              </NavLink>
+            ))}
+          </div>
+        )}
       </nav>
 
       <div className="sidebar-footer">
