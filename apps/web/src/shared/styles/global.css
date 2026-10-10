@@ -257,3 +257,318 @@ a {
 .rename-input {
   min-height: 28px;
 }
+
+/* --- Задачи (M3) --- */
+
+.page-columns {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.page-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.page-header h1 {
+  margin: 0 0 12px;
+  font-size: 22px;
+}
+
+.page-status,
+.page-error,
+.page-message {
+  color: var(--muted);
+}
+
+.page-error {
+  color: #dc2626;
+}
+
+.quick-add {
+  margin-bottom: 16px;
+}
+
+.quick-add-input {
+  min-height: 38px;
+}
+
+.quick-add-preview {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.chip {
+  font-size: 12px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+
+.quick-add-error {
+  color: #dc2626;
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
+.task-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.task-group {
+  margin-bottom: 8px;
+}
+
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  padding: 6px 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.group-header:hover {
+  background: var(--hover-bg);
+}
+
+.group-title {
+  color: var(--fg);
+}
+
+.group-count {
+  font-weight: 400;
+}
+
+.task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.task-row {
+  border-bottom: 1px solid var(--border);
+}
+
+.task-row:last-child {
+  border-bottom: none;
+}
+
+.task-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+}
+
+.task-line:hover {
+  background: var(--hover-bg);
+}
+
+.task-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.task-check.checked {
+  background: var(--fg);
+  border-color: var(--fg);
+}
+
+.task-check.small {
+  width: 14px;
+  height: 14px;
+}
+
+.task-title {
+  border: none;
+  padding: 2px 4px;
+  text-align: left;
+  background: none;
+  cursor: text;
+}
+
+.task-title:hover {
+  background: none;
+}
+
+.task-done .task-title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.task-due {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.task-due.overdue {
+  color: #dc2626;
+}
+
+.task-subtasks-toggle {
+  font-size: 12px;
+  color: var(--muted);
+  border: none;
+  padding: 2px 4px;
+}
+
+.subtasks {
+  padding: 4px 4px 8px 30px;
+}
+
+.subtasks-list {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.subtask-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.subtask-row .icon-btn {
+  visibility: hidden;
+}
+
+.subtask-row:hover .icon-btn {
+  visibility: visible;
+}
+
+.subtask-done {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.subtask-input {
+  min-height: 28px;
+  font-size: 14px;
+}
+
+.task-error {
+  color: #dc2626;
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.tasks-empty {
+  color: var(--muted);
+}
+
+/* --- Панель деталей --- */
+
+.details-panel {
+  position: sticky;
+  top: 16px;
+  flex: 0 0 320px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg);
+}
+
+.details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.details-heading {
+  margin: 0;
+  font-size: 16px;
+}
+
+.details-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.details-field input,
+.details-field select,
+.details-field textarea {
+  color: var(--fg);
+  font: inherit;
+  resize: vertical;
+}
+
+.details-row {
+  display: flex;
+  gap: 8px;
+}
+
+.details-row .details-field {
+  flex: 1;
+}
+
+.details-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.details-check input {
+  width: auto;
+}
+
+.details-saved {
+  color: #16a34a;
+  margin: 0;
+  font-size: 13px;
+}
+
+.details-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn {
+  border-radius: 6px;
+  padding: 6px 12px;
+}
+
+.btn.danger {
+  color: #dc2626;
+}
+
+@media (max-width: 720px) {
+  .page-columns {
+    flex-direction: column;
+  }
+
+  .details-panel {
+    position: fixed;
+    inset: auto 0 0 0;
+    border-radius: 14px 14px 0 0;
+    max-height: 80vh;
+    overflow-y: auto;
+    z-index: 10;
+  }
+}

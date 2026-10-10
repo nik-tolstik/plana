@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, NavLink, useNavigate } from "react-router";
 import { useSidebarQuery } from "@/entities/list";
 import { logout } from "@/features/auth";
 import { useCreateFolder, useCreateList } from "@/features/structure-manage";
@@ -8,8 +8,18 @@ import { AddForm } from "./add-form";
 import { FolderGroup } from "./folder-group";
 import { ListRow } from "./list-row";
 
-/** Умные списки, ожидающие M3 (реальные представления задач). */
-const SMART_STUBS = ["Сегодня", "Завтра", "Следующие 7 дней", "Все"];
+/** Умные списки — вычисляемые представления задач (роуты, не хранятся в БД). */
+const SMART_LINKS: Array<{ to: string; label: string }> = [
+  { to: "/today", label: "Сегодня" },
+  { to: "/tomorrow", label: "Завтра" },
+  { to: "/next7", label: "Следующие 7 дней" },
+  { to: "/all", label: "Все" },
+];
+
+const SMART_EXTRA: Array<{ to: string; label: string }> = [
+  { to: "/completed", label: "Завершённые" },
+  { to: "/trash", label: "Корзина" },
+];
 
 export function Sidebar() {
   const sidebarQuery = useSidebarQuery();
@@ -55,10 +65,23 @@ export function Sidebar() {
         {sidebar && (
           <div className="sidebar-section">
             <ListRow list={sidebar.inbox} onError={setError} />
-            {SMART_STUBS.map((name) => (
-              <span className="row row-disabled" key={name} title="Появится в M3">
-                {name}
-              </span>
+            {SMART_LINKS.map((link) => (
+              <NavLink
+                className={({ isActive }) => `row row-link${isActive ? " row-active" : ""}`}
+                key={link.to}
+                to={link.to}
+              >
+                {link.label}
+              </NavLink>
+            ))}
+            {SMART_EXTRA.map((link) => (
+              <NavLink
+                className={({ isActive }) => `row row-link${isActive ? " row-active" : ""}`}
+                key={link.to}
+                to={link.to}
+              >
+                {link.label}
+              </NavLink>
             ))}
           </div>
         )}

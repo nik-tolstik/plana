@@ -1,6 +1,7 @@
 export {
   useCreateFolder,
   useCreateList,
+  useCreateSection,
   useDeleteFolder,
   useRestoreList,
   useTrashList,

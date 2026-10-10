@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   HttpCode,
   Param,
   ParseUUIDPipe,
@@ -66,5 +67,13 @@ export class ListsController {
     @Body(new ZodValidationPipe(createSectionSchema)) dto: CreateSectionDto,
   ): Promise<SectionDto> {
     return this.listsService.createSection(userId, listId, dto);
+  }
+
+  @Get("lists/:id/sections")
+  listSections(
+    @CurrentUserId() userId: string,
+    @Param("id", ParseUUIDPipe) listId: string,
+  ): Promise<SectionDto[]> {
+    return this.listsService.listSections(userId, listId);
   }
 }

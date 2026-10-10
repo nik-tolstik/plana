@@ -9,6 +9,7 @@ import { FoldersModule } from "./modules/folders/folders.module";
 import { HealthModule } from "./modules/health/health.module";
 import { ListsModule } from "./modules/lists/lists.module";
 import { SectionsModule } from "./modules/sections/sections.module";
+import { TasksModule } from "./modules/tasks/tasks.module";
 import { UsersModule } from "./modules/users/users.module";
 
 @Module({
@@ -20,6 +21,7 @@ import { UsersModule } from "./modules/users/users.module";
     FoldersModule,
     ListsModule,
     SectionsModule,
+    TasksModule,
     HealthModule,
   ],
   providers: [

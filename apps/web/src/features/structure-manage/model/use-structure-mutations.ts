@@ -7,11 +7,27 @@ import {
   structureKeys,
 } from "@/entities/list";
 import { apiCreateFolder, apiDeleteFolder, apiUpdateFolder } from "@/entities/folder";
+import { apiClient } from "@/shared/api/client";
+import { sectionSchema, type SectionDto } from "@plana/shared";
 
 /** Все мутации структуры после успеха перезагружают дерево сайдбара. */
 function useInvalidateSidebar() {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: structureKeys.sidebar });
+}
+
+function useInvalidateSections(listId: string) {
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: structureKeys.sections(listId) });
+}
+
+export function useCreateSection(listId: string) {
+  const invalidate = useInvalidateSections(listId);
+  return useMutation({
+    mutationFn: (name: string) =>
+      apiClient.post<SectionDto>(`/v1/lists/${listId}/sections`, sectionSchema, { name }),
+    onSuccess: invalidate,
+  });
 }
 
 export function useCreateList() {

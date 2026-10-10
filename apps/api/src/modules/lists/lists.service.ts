@@ -232,6 +232,17 @@ export class ListsService {
       .returning();
     return toSectionDto(created!);
   }
+
+  async listSections(userId: string, listId: string): Promise<SectionDto[]> {
+    await this.findOwned(userId, listId);
+    return (
+      await this.db
+        .select()
+        .from(sections)
+        .where(eq(sections.listId, listId))
+        .orderBy(asc(sections.position))
+    ).map(toSectionDto);
+  }
 }
 
 export type SectionRow = typeof sections.$inferSelect;

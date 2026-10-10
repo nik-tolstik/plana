@@ -7,6 +7,7 @@ import { HomePage } from "@/pages/home";
 import { ListPage } from "@/pages/list";
 import { LoginPage } from "@/pages/login";
 import { SettingsPage } from "@/pages/settings";
+import { SmartPage } from "@/pages/smart";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const status = useSessionStore((state) => state.status);
@@ -37,6 +38,13 @@ export const router = createBrowserRouter([
     children: [
       { path: "/", element: <HomePage /> },
       { path: "/list/:listId", element: <ListPage /> },
+      { path: "/inbox", element: <SmartPage smart="inbox" /> },
+      { path: "/today", element: <SmartPage smart="today" /> },
+      { path: "/tomorrow", element: <SmartPage smart="tomorrow" /> },
+      { path: "/next7", element: <SmartPage smart="next7" /> },
+      { path: "/all", element: <SmartPage smart="all" /> },
+      { path: "/completed", element: <SmartPage smart="completed" /> },
+      { path: "/trash", element: <SmartPage smart="trash" /> },
       { path: "/habits", element: <HabitsPage /> },
       { path: "/settings", element: <SettingsPage /> },
     ],
