@@ -1,4 +1,5 @@
 import type { HabitWithEntriesDto } from "@plana/shared";
+import { cn } from "@/shared/lib/cn";
 import { WEEKDAY_HEADERS, calendarCells, calendarDays } from "../model/calendar";
 import type { MonthCursor } from "../model/calendar";
 
@@ -17,9 +18,13 @@ export function HabitCalendar({ habit, cursor, today, onToggleDay, pending }: Ha
   const days = calendarDays(habit, cursor, today);
 
   return (
-    <div className="habit-calendar" aria-label="Календарь привычки">
+    <div
+      className="grid grid-cols-7 gap-1 text-center"
+      role="group"
+      aria-label="Календарь привычки"
+    >
       {WEEKDAY_HEADERS.map((title) => (
-        <span className="habit-dow" key={title}>
+        <span className="text-xs text-muted-foreground" key={title}>
           {title}
         </span>
       ))}
@@ -28,20 +33,19 @@ export function HabitCalendar({ habit, cursor, today, onToggleDay, pending }: Ha
       ))}
       {days.map((day) => {
         const clickable = day.state !== "future" && !pending;
-        const classes = [
-          "habit-day",
-          day.done ? "done" : "",
-          day.partial ? "partial" : "",
-          !day.scheduled ? "off" : "",
-          day.state === "future" ? "future" : "",
-          day.state === "today" ? "today" : "",
-          clickable ? "clickable" : "",
-        ]
-          .filter(Boolean)
-          .join(" ");
         return (
           <button
-            className={classes}
+            className={cn(
+              "flex h-9 cursor-pointer items-center justify-center rounded-md text-xs font-medium tabular-nums transition-colors",
+              "focus-visible:ring-2 focus-visible:ring-control-focus/30 outline-none",
+              day.done && "bg-success text-success-foreground hover:brightness-95",
+              !day.done && day.partial && "text-success ring-1 ring-success hover:bg-surface-hover",
+              !day.done && !day.partial && "hover:bg-surface-hover",
+              !day.scheduled && "border border-dashed border-border",
+              day.state === "today" && !day.done && "ring-1 ring-foreground/60",
+              day.state === "future" && "pointer-events-none opacity-30",
+              !clickable && !day.done && "opacity-60",
+            )}
             disabled={!clickable}
             key={day.date}
             title={day.date}

@@ -15,7 +15,7 @@ export function TaskListView({ groups, today, onOpenDetails, dnd }: TaskListView
     return null;
   }
   return (
-    <div className="task-groups">
+    <div className="flex flex-col gap-4">
       {groups.map((group) => (
         <TaskGroupBlock
           group={group}

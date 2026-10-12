@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
+import { PencilIcon, XIcon } from "lucide-react";
 import type { ListDto } from "@plana/shared";
 import { useTrashList, useUpdateList } from "@/features/structure-manage";
 import { errorMessage } from "@/shared/lib/error-message";
+import { cn } from "@/shared/lib/cn";
+import { Input } from "@/shared/ui";
 import { LIST_DOT_COLORS } from "../model/colors";
 
 interface ListRowProps {
@@ -49,8 +52,8 @@ export function ListRow({ list, onError }: ListRowProps) {
 
   if (editing) {
     return (
-      <input
-        className="rename-input"
+      <Input
+        className="min-h-7"
         value={name}
         onChange={(event) => setName(event.target.value)}
         onBlur={saveRename}
@@ -72,30 +75,47 @@ export function ListRow({ list, onError }: ListRowProps) {
   const editable = list.kind !== "inbox";
 
   return (
-    <div className={active ? "row row-active" : "row"}>
-      <Link className="row-link" to={`/list/${list.id}`}>
+    <div
+      className={cn(
+        "group flex min-h-8 items-center rounded-md pr-1 transition-colors hover:bg-surface-hover",
+        active && "bg-surface-selected",
+      )}
+    >
+      <Link
+        className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left"
+        to={`/list/${list.id}`}
+      >
         {list.emoji ? (
           <span aria-hidden>{list.emoji}</span>
         ) : (
-          <span className="dot" style={{ background: LIST_DOT_COLORS[list.color] }} aria-hidden />
+          <span
+            className="size-2.5 shrink-0 rounded-full"
+            style={{ background: LIST_DOT_COLORS[list.color] }}
+            aria-hidden
+          />
         )}
-        <span className="row-name">{list.name}</span>
+        <span className="truncate">{list.name}</span>
       </Link>
-      {editable && (
-        <span className="row-actions">
+      {editable ? (
+        <span className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
           <button
-            className="icon-btn"
+            className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
             type="button"
             title="Переименовать"
             onClick={() => setEditing(true)}
           >
-            ✎
+            <PencilIcon className="size-3.5" />
           </button>
-          <button className="icon-btn" type="button" title="Удалить" onClick={onDelete}>
-            ✕
+          <button
+            className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+            type="button"
+            title="Удалить"
+            onClick={onDelete}
+          >
+            <XIcon className="size-3.5" />
           </button>
         </span>
-      )}
+      ) : null}
     </div>
   );
 }

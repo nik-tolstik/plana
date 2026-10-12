@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { FlameIcon, LogOutIcon, PlusIcon, SearchIcon, SettingsIcon } from "lucide-react";
 import { Link, NavLink, useNavigate } from "react-router";
 import { useSidebarQuery } from "@/entities/list";
 import { useTagsQuery } from "@/entities/tag";
 import { logout } from "@/features/auth";
 import { useCreateFolder, useCreateList } from "@/features/structure-manage";
 import { errorMessage } from "@/shared/lib/error-message";
+import { Button, Input } from "@/shared/ui";
 import { AddForm } from "./add-form";
 import { FolderGroup } from "./folder-group";
 import { ListRow } from "./list-row";
@@ -21,6 +24,23 @@ const SMART_EXTRA: Array<{ to: string; label: string }> = [
   { to: "/completed", label: "Завершённые" },
   { to: "/trash", label: "Корзина" },
 ];
+
+/** Приход/уход инлайн-форм: раскрытие по высоте + fade. */
+function Collapse({ children }: { children: React.ReactNode }) {
+  const prefersReducedMotion = useReducedMotion();
+
+  return (
+    <motion.div
+      initial={prefersReducedMotion ? false : { height: 0, opacity: 0 }}
+      animate={{ height: "auto", opacity: 1 }}
+      exit={prefersReducedMotion ? { height: 0, opacity: 0 } : undefined}
+      transition={{ duration: 0.18, ease: "easeOut" }}
+      className="overflow-hidden"
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 export function Sidebar() {
   const sidebarQuery = useSidebarQuery();
@@ -60,53 +80,50 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="sidebar">
-      <Link className="sidebar-brand" to="/">
+    <aside className="sticky top-0 flex h-dvh w-[264px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-border p-3 max-md:h-auto max-md:w-full max-md:border-r-0 max-md:border-b">
+      <Link className="px-2 text-lg font-bold" to="/">
         Plana
       </Link>
 
       <form
-        className="sidebar-search"
         onSubmit={(event) => {
           event.preventDefault();
           const q = search.trim();
           navigate(q.length > 0 ? `/search?q=${encodeURIComponent(q)}` : "/search");
         }}
       >
-        <input
+        <Input
           aria-label="Поиск задач"
           placeholder="Поиск…"
+          prefix={<SearchIcon className="size-3.5" />}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
       </form>
 
-      <nav aria-label="Списки">
-        {sidebar && (
-          <div className="sidebar-section">
+      <nav aria-label="Списки" className="flex min-w-0 flex-1 flex-col gap-3">
+        {sidebar ? (
+          <div className="flex flex-col gap-0.5">
             <ListRow list={sidebar.inbox} onError={setError} />
-            {SMART_LINKS.map((link) => (
+            {[...SMART_LINKS, ...SMART_EXTRA].map((link) => (
               <NavLink
-                className={({ isActive }) => `row row-link${isActive ? " row-active" : ""}`}
+                className={({ isActive }) =>
+                  `group flex min-h-8 items-center rounded-md pr-1 transition-colors hover:bg-surface-hover ${
+                    isActive ? "bg-surface-selected" : ""
+                  }`
+                }
                 key={link.to}
                 to={link.to}
               >
-                {link.label}
-              </NavLink>
-            ))}
-            {SMART_EXTRA.map((link) => (
-              <NavLink
-                className={({ isActive }) => `row row-link${isActive ? " row-active" : ""}`}
-                key={link.to}
-                to={link.to}
-              >
-                {link.label}
+                <span className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left">
+                  {link.label}
+                </span>
               </NavLink>
             ))}
           </div>
-        )}
+        ) : null}
 
-        <div className="sidebar-section">
+        <div className="flex flex-col gap-0.5">
           {sidebar?.rootLists.map((list) => (
             <ListRow key={list.id} list={list} onError={setError} />
           ))}
@@ -114,75 +131,97 @@ export function Sidebar() {
             <FolderGroup key={folder.id} folder={folder} onError={setError} />
           ))}
 
-          {addingList ? (
-            <AddForm
-              placeholder="Название списка"
-              onSubmit={addList}
-              onCancel={() => setAddingList(false)}
-            />
-          ) : (
-            <button
-              className="add-btn"
-              type="button"
-              onClick={() => {
-                setAddingList(true);
-                setAddingFolder(false);
-              }}
-            >
-              + Список
-            </button>
-          )}
+          <AnimatePresence initial={false}>
+            {addingList ? (
+              <Collapse key="add-list">
+                <AddForm
+                  placeholder="Название списка"
+                  onSubmit={addList}
+                  onCancel={() => setAddingList(false)}
+                />
+              </Collapse>
+            ) : (
+              <Button
+                key="btn-list"
+                variant="ghost"
+                size="sm"
+                className="justify-start text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setAddingList(true);
+                  setAddingFolder(false);
+                }}
+              >
+                <PlusIcon /> Список
+              </Button>
+            )}
+          </AnimatePresence>
 
-          {addingFolder ? (
-            <AddForm
-              placeholder="Название папки"
-              onSubmit={addFolder}
-              onCancel={() => setAddingFolder(false)}
-            />
-          ) : (
-            <button
-              className="add-btn"
-              type="button"
-              onClick={() => {
-                setAddingFolder(true);
-                setAddingList(false);
-              }}
-            >
-              + Папка
-            </button>
-          )}
+          <AnimatePresence initial={false}>
+            {addingFolder ? (
+              <Collapse key="add-folder">
+                <AddForm
+                  placeholder="Название папки"
+                  onSubmit={addFolder}
+                  onCancel={() => setAddingFolder(false)}
+                />
+              </Collapse>
+            ) : (
+              <Button
+                key="btn-folder"
+                variant="ghost"
+                size="sm"
+                className="justify-start text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setAddingFolder(true);
+                  setAddingList(false);
+                }}
+              >
+                <PlusIcon /> Папка
+              </Button>
+            )}
+          </AnimatePresence>
         </div>
 
-        {tags.length > 0 && (
-          <div className="sidebar-section sidebar-tags">
+        {tags.length > 0 ? (
+          <div className="flex flex-col gap-0.5">
             {tags.map((tag) => (
               <NavLink
-                className={({ isActive }) => `row row-link${isActive ? " row-active" : ""}`}
+                className={({ isActive }) =>
+                  `group flex min-h-8 items-center rounded-md pr-1 transition-colors hover:bg-surface-hover ${
+                    isActive ? "bg-surface-selected" : ""
+                  }`
+                }
                 key={tag.id}
                 to={`/tag/${tag.id}`}
               >
-                #{tag.name}
+                <span className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left">
+                  #{tag.name}
+                </span>
               </NavLink>
             ))}
           </div>
-        )}
+        ) : null}
       </nav>
 
-      <div className="sidebar-footer">
-        <Link to="/habits">Привычки</Link>
-        <Link to="/settings">Настройки</Link>
-        <button type="button" onClick={onLogout}>
-          Выйти
-        </button>
+      <div className="flex flex-wrap items-center gap-1 border-t border-border pt-2 text-sm">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/habits")}>
+          <FlameIcon className="size-4" /> Привычки
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => navigate("/settings")}>
+          <SettingsIcon className="size-4" /> Настройки
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onLogout}>
+          <LogOutIcon className="size-4" /> Выйти
+        </Button>
       </div>
 
-      {sidebarQuery.isPending && <p className="sidebar-status">Загрузка…</p>}
-      {sidebarQuery.isError && (
-        <p className="sidebar-status sidebar-error">
+      {sidebarQuery.isPending ? <p className="text-sm text-muted-foreground">Загрузка…</p> : null}
+      {sidebarQuery.isError ? (
+        <p className="text-sm text-destructive">
           Не удалось загрузить списки: {errorMessage(sidebarQuery.error)}
         </p>
-      )}
-      {error && <p className="sidebar-status sidebar-error">{error}</p>}
+      ) : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </aside>
   );
 }

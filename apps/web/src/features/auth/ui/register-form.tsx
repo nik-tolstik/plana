@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { useSessionStore } from "@/entities/user";
 import { ApiError } from "@/shared/api/client";
 import { session } from "@/shared/api/session";
+import { Button, Input, Label } from "@/shared/ui";
 import { apiRegister } from "../api/auth-api";
 import { applyTheme } from "@/features/theme-switch/model/theme";
 
@@ -37,41 +38,50 @@ export function RegisterForm() {
   }
 
   return (
-    <form onSubmit={onSubmit}>
-      <label>
-        Имя
-        <input
+    <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="register-name">Имя</Label>
+        <Input
+          id="register-name"
           value={name}
           onChange={(event) => setName(event.target.value)}
           autoComplete="name"
           required
         />
-      </label>
-      <label>
-        Email
-        <input
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="register-email">Email</Label>
+        <Input
+          id="register-email"
           type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           autoComplete="email"
+          aria-invalid={error != null}
           required
         />
-      </label>
-      <label>
-        Пароль (минимум 8 символов)
-        <input
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="register-password">Пароль (минимум 8 символов)</Label>
+        <Input
+          id="register-password"
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           autoComplete="new-password"
           minLength={8}
+          aria-invalid={error != null}
           required
         />
-      </label>
-      {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={pending}>
+      </div>
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+      <Button type="submit" disabled={pending}>
         {pending ? "Создаём…" : "Создать аккаунт"}
-      </button>
+      </Button>
     </form>
   );
 }

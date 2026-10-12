@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { userSchema, type UserDto, type UserTheme } from "@plana/shared";
 import { apiClient } from "@/shared/api/client";
+import { Segmented } from "@/shared/ui";
 import { applyTheme, currentTheme } from "../model/theme";
 
 const OPTIONS: Array<{ value: UserTheme; label: string }> = [
@@ -23,17 +24,12 @@ export function ThemeSwitch({ onUserUpdated }: { onUserUpdated?: (user: UserDto)
   }
 
   return (
-    <div role="group" aria-label="Тема оформления">
-      {OPTIONS.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          aria-pressed={theme === option.value}
-          onClick={() => select(option.value)}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      aria-label="Тема оформления"
+      name="theme"
+      value={theme}
+      onChange={select}
+      options={OPTIONS}
+    />
   );
 }

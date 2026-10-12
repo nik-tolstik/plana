@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence } from "motion/react";
+import { SearchIcon } from "lucide-react";
 import { useSearchParams } from "react-router";
 import { todayInZone } from "@plana/shared";
 import { useTasksQuery, useUserTimezone } from "@/entities/task";
+import { Input, PageFade, Skeleton } from "@/shared/ui";
 import { TaskDetails } from "@/widgets/task-details";
 import { groupByDueDate, TaskListView } from "@/widgets/task-list";
 
@@ -41,41 +44,52 @@ export function SearchPage() {
   const detailsTask = tasks.find((task) => task.id === detailsTaskId);
 
   return (
-    <div className="page-columns">
-      <div className="page-main">
-        <header className="page-header">
-          <h1>Поиск</h1>
+    <div className="flex w-full items-start gap-6">
+      <PageFade className="min-w-0 flex-1 flex-col gap-3">
+        <header>
+          <h1 className="mb-3 text-xl font-semibold">Поиск</h1>
         </header>
 
-        <div className="search-box">
-          <input
-            aria-label="Поиск задач"
-            autoFocus
-            className="search-input"
-            placeholder="Искать по заголовку и описанию…"
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-          />
-        </div>
+        <Input
+          aria-label="Поиск задач"
+          autoFocus
+          prefix={<SearchIcon className="size-4" />}
+          placeholder="Искать по заголовку и описанию…"
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+        />
 
-        {enabled && tasksQuery.isPending && <p className="page-status">Загрузка…</p>}
-        {enabled && tasksQuery.isError && <p className="page-error">Не удалось выполнить поиск</p>}
+        {enabled && tasksQuery.isPending ? (
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-2/3" />
+          </div>
+        ) : null}
+        {enabled && tasksQuery.isError ? (
+          <p className="text-destructive">Не удалось выполнить поиск</p>
+        ) : null}
 
         <TaskListView groups={groups} today={today} onOpenDetails={setDetailsTaskId} />
 
-        {enabled && !tasksQuery.isPending && tasks.length === 0 && (
-          <p className="tasks-empty">Ничего не найдено</p>
-        )}
-        {!enabled && <p className="tasks-empty">Введите запрос — поиск по заголовку и описанию</p>}
-      </div>
+        {enabled && !tasksQuery.isPending && tasks.length === 0 ? (
+          <p className="py-8 text-center text-muted-foreground">Ничего не найдено</p>
+        ) : null}
+        {!enabled ? (
+          <p className="py-8 text-center text-muted-foreground">
+            Введите запрос — поиск по заголовку и описанию
+          </p>
+        ) : null}
+      </PageFade>
 
-      {detailsTask && (
-        <TaskDetails
-          key={detailsTask.id}
-          task={detailsTask}
-          onClose={() => setDetailsTaskId(null)}
-        />
-      )}
+      <AnimatePresence>
+        {detailsTask ? (
+          <TaskDetails
+            key={detailsTask.id}
+            task={detailsTask}
+            onClose={() => setDetailsTaskId(null)}
+          />
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,0 +1,282 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/*
+ * Дизайн-система Plana (этап DS). Основа — токены finnn, перенесённые с ревью:
+ * три уровня — палитра (сырые значения), семантика (surface/text/border/focus),
+ * компонентные контракты (control/segmented/popover/dialog).
+ * Правила использования: docs/design/design-system.md.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  /* Fonts */
+  --font-sans:
+    var(--font-onest), "Onest", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Colors: shadcn-подобный API (bg-background, text-muted-foreground, …) */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ring: var(--ring);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-primary-text: var(--primary-text);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* Semantic surfaces */
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-inset: var(--surface-inset);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-surface-control: var(--surface-control);
+  --color-surface-control-hover: var(--surface-control-hover);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-selected: var(--surface-selected);
+
+  /* Component tokens */
+  --color-dialog: var(--dialog-background);
+  --color-popover: var(--popover-background);
+  --color-control: var(--control-background);
+  --color-control-hover: var(--control-background-hover);
+  --color-control-focus: var(--control-focus);
+  --color-control-placeholder: var(--control-placeholder);
+  --color-segmented: var(--segmented-background);
+  --color-segmented-indicator: var(--segmented-indicator);
+  --color-segmented-hover: var(--segmented-hover);
+  --color-option-hover: var(--option-hover);
+  --color-option-selected: var(--option-selected);
+
+  /* Domain: приоритеты задач */
+  --color-priority-low: var(--priority-low);
+  --color-priority-medium: var(--priority-medium);
+  --color-priority-high: var(--priority-high);
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+}
+
+:root {
+  --font-onest: "Onest Variable";
+
+  /* Palette: сырые значения, в компонентах не использовать. */
+  --palette-white: #ffffff;
+  --palette-neutral-50: #fafafa;
+  --palette-neutral-100: #f7f7f8;
+  --palette-neutral-125: #f4f4f5;
+  --palette-neutral-150: #f1f1f2;
+  --palette-neutral-200: #e5e5e7;
+  --palette-neutral-500: #6b6b70;
+  --palette-neutral-900: #17171a;
+  /* 4.61:1 с белым (AA); #2f6bff из finnn давал 4.49:1 */
+  --palette-blue-600: #2d69fd;
+  --palette-dark-700: oklch(0.3 0 0);
+  --palette-dark-750: oklch(0.269 0 0);
+  --palette-dark-800: oklch(0.23 0 0);
+  --palette-dark-850: oklch(0.21 0 0);
+  --palette-dark-900: oklch(0.19 0 0);
+  --palette-dark-text-secondary: oklch(0.708 0 0);
+  --app-accent-color: var(--palette-blue-600);
+}
+
+/* Сменные акценты (UI выбора — post-MVP, контракт готов). */
+html[data-accent-color="blue"] {
+  --app-accent-color: var(--palette-blue-600);
+}
+
+:root,
+html.light {
+  /* Semantic tokens */
+  --surface-canvas: var(--palette-white);
+  --surface-raised: var(--palette-white);
+  --surface-inset: var(--palette-white);
+  --surface-subtle: var(--palette-neutral-100);
+  --surface-control: var(--palette-neutral-125);
+  --surface-control-hover: var(--palette-neutral-150);
+  --surface-hover: var(--palette-neutral-150);
+  --surface-selected: var(--palette-neutral-150);
+  --text-primary: var(--palette-neutral-900);
+  --text-secondary: var(--palette-neutral-500);
+  --border-default: var(--palette-neutral-200);
+  --focus-ring: var(--app-accent-color);
+
+  /* Tailwind API aliases */
+  --background: var(--surface-canvas);
+  --foreground: var(--text-primary);
+  --card: var(--surface-raised);
+  --card-foreground: var(--text-primary);
+  --primary: var(--app-accent-color);
+  --primary-foreground: var(--palette-white);
+  /* акцент как цвет текста: в тёмной теме светлеет до blue-400 (7.25:1) */
+  --primary-text: var(--palette-blue-600);
+  --secondary: var(--surface-control);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--surface-subtle);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--surface-selected);
+  --accent-foreground: var(--text-primary);
+  /* green-700/red-600: единственные шаги палитры с AA-контрастом и как фон с белым, и как текст */
+  --success: var(--color-green-700);
+  --success-foreground: var(--palette-white);
+  --destructive: var(--color-red-600);
+  --destructive-foreground: var(--palette-white);
+  --border: var(--border-default);
+  --ring: var(--focus-ring);
+
+  /* Component tokens */
+  --dialog-background: var(--surface-raised);
+  --popover-background: var(--surface-inset);
+  --control-background: var(--surface-control);
+  --control-background-hover: var(--surface-control-hover);
+  --control-focus: var(--focus-ring);
+  --control-placeholder: var(--text-secondary);
+  --segmented-background: var(--surface-control);
+  --segmented-indicator: var(--surface-raised);
+  --segmented-hover: var(--surface-control-hover);
+  --option-hover: var(--surface-hover);
+  --option-selected: var(--surface-selected);
+
+  /* Domain: приоритеты (стрелки в списке задач) */
+  --priority-low: var(--color-blue-400);
+  --priority-medium: var(--color-orange-400);
+  --priority-high: var(--color-red-500);
+
+  /* Миграционные алиасы: старые имена переменных → новые токены.
+   * Удаляются вместе с legacy.css в конце миграции на Tailwind. */
+  --bg: var(--background);
+  --fg: var(--foreground);
+  --hover-bg: var(--surface-hover);
+  --active-bg: var(--surface-selected);
+}
+
+html.dark {
+  --surface-canvas: var(--palette-dark-900);
+  --surface-inset: var(--palette-dark-850);
+  --surface-raised: var(--palette-dark-800);
+  --surface-subtle: var(--palette-dark-750);
+  --surface-control: var(--palette-dark-750);
+  --surface-control-hover: var(--palette-dark-700);
+  --surface-hover: var(--palette-dark-700);
+  --surface-selected: var(--palette-dark-750);
+  --text-primary: var(--palette-white);
+  --text-secondary: var(--palette-dark-text-secondary);
+  --border-default: oklch(1 0 0 / 10%);
+  --focus-ring: var(--palette-white);
+
+  --background: var(--surface-canvas);
+  --foreground: var(--text-primary);
+  --card: var(--surface-raised);
+  --card-foreground: var(--text-primary);
+  --primary: var(--app-accent-color);
+  --primary-foreground: var(--palette-white);
+  --primary-text: var(--color-blue-400);
+  --secondary: var(--surface-control);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--surface-subtle);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--surface-selected);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--color-red-400);
+  /* тёмный текст на красном-400: 5.75:1 (белый давал 2.77:1) */
+  --destructive-foreground: oklch(0.145 0 0);
+  --border: var(--border-default);
+  --ring: var(--focus-ring);
+  --success: var(--color-green-400);
+  --success-foreground: oklch(0.145 0 0);
+
+  --dialog-background: var(--surface-canvas);
+  --popover-background: var(--surface-inset);
+  --control-background: var(--surface-control);
+  --control-background-hover: var(--surface-control-hover);
+  --control-focus: var(--focus-ring);
+  --control-placeholder: var(--text-secondary);
+  --segmented-background: var(--surface-control);
+  --segmented-indicator: var(--surface-canvas);
+  --segmented-hover: var(--surface-control-hover);
+  --option-hover: var(--surface-hover);
+  --option-selected: var(--surface-hover);
+
+  --priority-low: var(--color-blue-400);
+  --priority-medium: var(--color-orange-400);
+  --priority-high: var(--color-red-400);
+
+  --bg: var(--background);
+  --fg: var(--foreground);
+  --hover-bg: var(--surface-hover);
+  --active-bg: var(--surface-selected);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    margin: 0;
+    scrollbar-gutter: stable;
+  }
+
+  html {
+    overscroll-behavior-y: contain;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 3px;
+    border: none;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
+  }
+}

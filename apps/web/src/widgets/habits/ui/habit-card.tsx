@@ -1,5 +1,8 @@
+import { ArchiveIcon, FlameIcon, MinusIcon, PlusIcon } from "lucide-react";
 import { habitScheduleLabel, habitStreaks, type HabitWithEntriesDto } from "@plana/shared";
 import { useDeleteHabitEntry, useSetHabitEntry, useUpdateHabit } from "@/features/habit-manage";
+import { cn } from "@/shared/lib/cn";
+import { Button, Checkbox } from "@/shared/ui";
 import { HabitCalendar } from "./habit-calendar";
 import { LIST_DOT_COLORS } from "@/widgets/sidebar/model/colors";
 import type { MonthCursor } from "../model/calendar";
@@ -51,59 +54,72 @@ export function HabitCard({ habit, cursor, today }: HabitCardProps) {
   }
 
   return (
-    <article className="habit-card">
-      <header className="habit-header">
+    <article className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
+      <header className="flex flex-wrap items-center gap-2">
         <span
-          className="habit-dot"
+          className="size-2.5 shrink-0 rounded-full"
           style={{ background: LIST_DOT_COLORS[habit.color] }}
           aria-hidden="true"
         />
-        <h2 className="habit-name">{habit.name}</h2>
-        <span className="habit-meta">{habitScheduleLabel(habit.daysOfWeek)}</span>
-        <span className="habit-streak" title={`Лучший стрик: ${streaks.best}`}>
-          🔥 {streaks.current}
+        <h2 className="text-base font-semibold">{habit.name}</h2>
+        <span className="text-xs text-muted-foreground">
+          {habitScheduleLabel(habit.daysOfWeek)}
         </span>
-        <button
-          className="icon-btn"
+        <span
+          className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-orange-500"
+          title={`Лучший стрик: ${streaks.best}`}
+        >
+          <FlameIcon className="size-4" aria-hidden="true" /> {streaks.current}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon-sm"
           disabled={pending}
           title="В архив"
-          type="button"
           onClick={archive}
+          aria-label="В архив"
         >
-          🗃
-        </button>
+          <ArchiveIcon className="size-4" />
+        </Button>
       </header>
 
-      <div className="habit-today">
+      <div>
         {habit.type === "check" ? (
-          <button
-            aria-label={todayDone ? "Снять отметку за сегодня" : "Отметить сегодня"}
-            className={`habit-check${todayDone ? " checked" : ""}`}
+          <Checkbox
+            size="lg"
+            checked={todayDone}
             disabled={pending}
-            type="button"
-            onClick={() => toggleDate(today, todayValue, todayDone)}
+            onCheckedChange={() => toggleDate(today, todayValue, todayDone)}
+            aria-label={todayDone ? "Снять отметку за сегодня" : "Отметить сегодня"}
           />
         ) : (
-          <div className="habit-counter">
-            <button
-              aria-label="Уменьшить"
+          <div className="inline-flex items-center gap-2">
+            <Button
+              variant="field"
+              size="icon-sm"
               disabled={pending || todayValue === 0}
-              type="button"
               onClick={() => stepToday(-1)}
+              aria-label="Уменьшить"
             >
-              −
-            </button>
-            <span className={todayDone ? "done" : ""}>
+              <MinusIcon className="size-4" />
+            </Button>
+            <span
+              className={cn(
+                "min-w-12 text-center text-sm font-medium tabular-nums",
+                todayDone ? "text-success" : "text-foreground",
+              )}
+            >
               {todayValue}/{habit.targetValue}
             </span>
-            <button
-              aria-label="Увеличить"
+            <Button
+              variant="field"
+              size="icon-sm"
               disabled={pending || todayValue >= (habit.targetValue ?? 1) * 2}
-              type="button"
               onClick={() => stepToday(1)}
+              aria-label="Увеличить"
             >
-              +
-            </button>
+              <PlusIcon className="size-4" />
+            </Button>
           </div>
         )}
       </div>

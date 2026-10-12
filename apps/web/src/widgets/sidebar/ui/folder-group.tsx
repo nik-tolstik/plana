@@ -1,8 +1,11 @@
 import { useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { ChevronDownIcon, PencilIcon, PlusIcon, XIcon } from "lucide-react";
 import type { ListDto } from "@plana/shared";
 import type { FolderDto } from "@/entities/folder";
 import { useCreateList, useDeleteFolder, useUpdateFolder } from "@/features/structure-manage";
 import { errorMessage } from "@/shared/lib/error-message";
+import { Input } from "@/shared/ui";
 import { AddForm } from "./add-form";
 import { ListRow } from "./list-row";
 
@@ -20,6 +23,7 @@ export function FolderGroup({
   const [addingList, setAddingList] = useState(false);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(folder.name);
+  const prefersReducedMotion = useReducedMotion();
 
   const createList = useCreateList();
   const updateFolder = useUpdateFolder();
@@ -60,11 +64,11 @@ export function FolderGroup({
   }
 
   return (
-    <div className="folder-group">
-      <div className="row">
+    <div>
+      <div className="group flex min-h-8 items-center rounded-md pr-1 transition-colors hover:bg-surface-hover">
         {editing ? (
-          <input
-            className="rename-input"
+          <Input
+            className="min-h-7"
             value={name}
             onChange={(event) => setName(event.target.value)}
             onBlur={saveRename}
@@ -83,17 +87,24 @@ export function FolderGroup({
         ) : (
           <>
             <button
-              className="row-link folder-toggle"
+              className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1 text-left font-semibold"
               type="button"
               aria-expanded={open}
               onClick={() => setOpen(!open)}
             >
-              <span aria-hidden>{open ? "▾" : "▸"}</span>
-              <span className="row-name">{folder.name}</span>
+              <motion.span
+                aria-hidden
+                className="flex items-center"
+                animate={{ rotate: open ? 0 : -90 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
+              >
+                <ChevronDownIcon className="size-4 text-muted-foreground" />
+              </motion.span>
+              <span className="truncate">{folder.name}</span>
             </button>
-            <span className="row-actions">
+            <span className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
               <button
-                className="icon-btn"
+                className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
                 type="button"
                 title="Добавить список в папку"
                 onClick={() => {
@@ -101,37 +112,53 @@ export function FolderGroup({
                   setAddingList(true);
                 }}
               >
-                +
+                <PlusIcon className="size-3.5" />
               </button>
               <button
-                className="icon-btn"
+                className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
                 type="button"
                 title="Переименовать"
                 onClick={() => setEditing(true)}
               >
-                ✎
+                <PencilIcon className="size-3.5" />
               </button>
-              <button className="icon-btn" type="button" title="Удалить" onClick={onDelete}>
-                ✕
+              <button
+                className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+                type="button"
+                title="Удалить"
+                onClick={onDelete}
+              >
+                <XIcon className="size-3.5" />
               </button>
             </span>
           </>
         )}
       </div>
-      {open && (
-        <div className="folder-lists">
-          {folder.lists.map((list) => (
-            <ListRow key={list.id} list={list} onError={onError} />
-          ))}
-          {addingList && (
-            <AddForm
-              placeholder="Название списка"
-              onSubmit={addList}
-              onCancel={() => setAddingList(false)}
-            />
-          )}
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {open ? (
+          <motion.div
+            key="folder-lists"
+            initial={prefersReducedMotion ? false : { height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-col gap-0.5 pl-4">
+              {folder.lists.map((list) => (
+                <ListRow key={list.id} list={list} onError={onError} />
+              ))}
+              {addingList ? (
+                <AddForm
+                  placeholder="Название списка"
+                  onSubmit={addList}
+                  onCancel={() => setAddingList(false)}
+                />
+              ) : null}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

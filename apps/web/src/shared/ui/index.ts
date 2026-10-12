@@ -1,4 +1,13 @@
-// Обёртки над Base UI (кнопки, диалоги, поля с классами Plana).
-// Наполняется на этапе дизайна. Компоненты выше слоя shared используют
-// только эти обёртки, а не Base UI напрямую. См. docs/architecture/frontend.md.
-export {};
+export * from "./animated-list/index.js";
+export * from "./badge/index.js";
+export * from "./button/index.js";
+export * from "./card/index.js";
+export * from "./checkbox/index.js";
+export * from "./dialog/index.js";
+export * from "./input/index.js";
+export * from "./label/index.js";
+export * from "./segmented/index.js";
+export * from "./select/index.js";
+export * from "./skeleton/index.js";
+export * from "./textarea/index.js";
+export * from "./page-fade/index.js";

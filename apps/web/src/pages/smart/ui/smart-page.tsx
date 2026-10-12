@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
+import { AnimatePresence } from "motion/react";
 import { todayInZone, type SmartListKey } from "@plana/shared";
 import { useTasksQuery, useUserTimezone } from "@/entities/task";
 import { QuickAdd } from "@/features/quick-add";
+import { PageFade, Skeleton } from "@/shared/ui";
 import { TaskDetails } from "@/widgets/task-details";
 import { groupByDueDate, TaskListView } from "@/widgets/task-list";
 
@@ -36,33 +38,43 @@ export function SmartPage({ smart }: SmartPageProps) {
   const detailsTask = tasks.find((task) => task.id === detailsTaskId);
 
   return (
-    <div className="page-columns">
-      <div className="page-main">
-        <header className="page-header">
-          <h1>{SMART_TITLES[smart]}</h1>
+    <div className="flex w-full items-start gap-6">
+      <PageFade className="min-w-0 flex-1 flex-col gap-3">
+        <header>
+          <h1 className="mb-3 text-xl font-semibold">{SMART_TITLES[smart]}</h1>
         </header>
 
-        {smart !== "completed" && smart !== "trash" && <QuickAdd />}
+        {smart !== "completed" && smart !== "trash" ? <QuickAdd /> : null}
 
-        {tasksQuery.isPending && <p className="page-status">Загрузка…</p>}
-        {tasksQuery.isError && <p className="page-error">Не удалось загрузить задачи</p>}
+        {tasksQuery.isPending ? (
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-2/3" />
+          </div>
+        ) : null}
+        {tasksQuery.isError ? (
+          <p className="text-destructive">Не удалось загрузить задачи</p>
+        ) : null}
 
         <TaskListView groups={groups} today={today} onOpenDetails={setDetailsTaskId} />
 
-        {!tasksQuery.isPending && tasks.length === 0 && (
-          <p className="tasks-empty">
+        {!tasksQuery.isPending && tasks.length === 0 ? (
+          <p className="py-8 text-center text-muted-foreground">
             {smart === "trash" ? "Корзина пуста" : "Задач нет — добавьте первую выше"}
           </p>
-        )}
-      </div>
+        ) : null}
+      </PageFade>
 
-      {detailsTask && (
-        <TaskDetails
-          key={detailsTask.id}
-          task={detailsTask}
-          onClose={() => setDetailsTaskId(null)}
-        />
-      )}
+      <AnimatePresence>
+        {detailsTask ? (
+          <TaskDetails
+            key={detailsTask.id}
+            task={detailsTask}
+            onClose={() => setDetailsTaskId(null)}
+          />
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

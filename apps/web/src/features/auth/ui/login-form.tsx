@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { useSessionStore } from "@/entities/user";
 import { ApiError } from "@/shared/api/client";
 import { session } from "@/shared/api/session";
+import { Button, Input, Label } from "@/shared/ui";
 import { apiLogin } from "../api/auth-api";
 import { applyTheme } from "@/features/theme-switch/model/theme";
 
@@ -32,31 +33,39 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit}>
-      <label>
-        Email
-        <input
+    <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="login-email">Email</Label>
+        <Input
+          id="login-email"
           type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           autoComplete="email"
+          aria-invalid={error != null}
           required
         />
-      </label>
-      <label>
-        Пароль
-        <input
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="login-password">Пароль</Label>
+        <Input
+          id="login-password"
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           autoComplete="current-password"
+          aria-invalid={error != null}
           required
         />
-      </label>
-      {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={pending}>
+      </div>
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+      <Button type="submit" disabled={pending}>
         {pending ? "Входим…" : "Войти"}
-      </button>
+      </Button>
     </form>
   );
 }

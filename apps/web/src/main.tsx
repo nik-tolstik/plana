@@ -4,7 +4,8 @@ import { RouterProvider } from "react-router";
 import { AppProviders } from "@/app/providers";
 import { router } from "@/app/routes";
 import { initTheme } from "@/features/theme-switch";
-import "@/shared/styles/global.css";
+import "@fontsource-variable/onest";
+import "@/shared/styles/globals.css";
 
 initTheme();
 

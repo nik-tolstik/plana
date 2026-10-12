@@ -1,4 +1,6 @@
 import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { CheckIcon, XIcon } from "lucide-react";
+import { Input } from "@/shared/ui";
 
 interface AddFormProps {
   placeholder: string;
@@ -33,8 +35,8 @@ export function AddForm({ placeholder, onSubmit, onCancel }: AddFormProps) {
   }
 
   return (
-    <form className="add-form" onSubmit={submit}>
-      <input
+    <form className="flex items-center gap-1 py-0.5" onSubmit={submit}>
+      <Input
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={onKeyDown}
@@ -42,12 +44,23 @@ export function AddForm({ placeholder, onSubmit, onCancel }: AddFormProps) {
         aria-label={placeholder}
         autoFocus
         disabled={busy}
+        className="min-h-8"
       />
-      <button className="icon-btn" type="submit" title="Добавить" disabled={busy}>
-        ✓
+      <button
+        className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground disabled:opacity-50"
+        type="submit"
+        title="Добавить"
+        disabled={busy}
+      >
+        <CheckIcon className="size-4" />
       </button>
-      <button className="icon-btn" type="button" title="Отмена" onClick={onCancel}>
-        ✕
+      <button
+        className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+        type="button"
+        title="Отмена"
+        onClick={onCancel}
+      >
+        <XIcon className="size-4" />
       </button>
     </form>
   );

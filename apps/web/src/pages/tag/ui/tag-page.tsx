@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { CheckIcon, PencilIcon, XIcon } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 import { todayInZone } from "@plana/shared";
 import { useTagsQuery } from "@/entities/tag";
 import { useTasksQuery, useUserTimezone } from "@/entities/task";
 import { useDeleteTag, useUpdateTag } from "@/features/tag-manage";
 import { errorMessage } from "@/shared/lib/error-message";
+import { Input, PageFade, Skeleton } from "@/shared/ui";
 import { TaskDetails } from "@/widgets/task-details";
 import { groupByDueDate, TaskListView } from "@/widgets/task-list";
 
@@ -63,90 +66,117 @@ export function TagPage() {
 
   if (tagsQuery.data && !tag) {
     return (
-      <div className="page-message">
-        <h1>Тег не найден</h1>
-        <p>Возможно, он удалён. </p>
-        <Link to="/">Вернуться на главную</Link>
-      </div>
+      <PageFade>
+        <h1 className="mb-3 text-xl font-semibold">Тег не найден</h1>
+        <p className="mb-4 text-muted-foreground">Возможно, он удалён.</p>
+        <Link className="text-primary-text hover:underline" to="/">
+          Вернуться на главную
+        </Link>
+      </PageFade>
     );
   }
 
   return (
-    <div className="page-columns">
-      <div className="page-main">
-        <header className="page-header tag-header">
-          <h1>#{tag?.name ?? "…"}</h1>
-          <div className="tag-actions">
-            {tag && (
-              <>
-                <button
-                  className="icon-btn"
-                  title="Переименовать"
-                  type="button"
-                  onClick={() => {
-                    setName(tag.name);
-                    setRenaming(true);
-                  }}
-                >
-                  ✎
-                </button>
-                <button
-                  className="icon-btn"
-                  title="Удалить тег"
-                  type="button"
-                  onClick={() => void remove()}
-                >
-                  ✕
-                </button>
-              </>
-            )}
-          </div>
+    <div className="flex w-full items-start gap-6">
+      <PageFade className="min-w-0 flex-1 flex-col gap-3">
+        <header className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold">#{tag?.name ?? "…"}</h1>
+          {tag ? (
+            <span className="flex gap-1">
+              <button
+                className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+                title="Переименовать"
+                type="button"
+                onClick={() => {
+                  setName(tag.name);
+                  setRenaming(true);
+                }}
+              >
+                <PencilIcon className="size-4" />
+              </button>
+              <button
+                className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+                title="Удалить тег"
+                type="button"
+                onClick={() => void remove()}
+              >
+                <XIcon className="size-4" />
+              </button>
+            </span>
+          ) : null}
         </header>
 
-        {renaming && (
-          <form
-            className="add-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void rename();
-            }}
-          >
-            <input
-              aria-label="Новое имя тега"
-              autoFocus
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") setRenaming(false);
+        <AnimatePresence initial={false}>
+          {renaming ? (
+            <motion.form
+              key="rename-tag"
+              className="flex items-center gap-1"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void rename();
               }}
-            />
-            <button disabled={updateTag.isPending} type="submit">
-              ✓
-            </button>
-            <button onClick={() => setRenaming(false)} type="button">
-              ✕
-            </button>
-          </form>
-        )}
-        {error && <p className="page-error">{error}</p>}
+            >
+              <Input
+                className="min-h-8"
+                aria-label="Новое имя тега"
+                autoFocus
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setRenaming(false);
+                }}
+              />
+              <button
+                className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground disabled:opacity-50"
+                disabled={updateTag.isPending}
+                type="submit"
+                title="Сохранить"
+              >
+                <CheckIcon className="size-4" />
+              </button>
+              <button
+                className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+                onClick={() => setRenaming(false)}
+                type="button"
+                title="Отмена"
+              >
+                <XIcon className="size-4" />
+              </button>
+            </motion.form>
+          ) : null}
+        </AnimatePresence>
+        {error ? <p className="text-destructive">{error}</p> : null}
 
-        {tasksQuery.isPending && <p className="page-status">Загрузка…</p>}
-        {tasksQuery.isError && <p className="page-error">Не удалось загрузить задачи</p>}
+        {tasksQuery.isPending ? (
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-2/3" />
+          </div>
+        ) : null}
+        {tasksQuery.isError ? (
+          <p className="text-destructive">Не удалось загрузить задачи</p>
+        ) : null}
 
         <TaskListView groups={groups} today={today} onOpenDetails={setDetailsTaskId} />
 
-        {!tasksQuery.isPending && tasks.length === 0 && (
-          <p className="tasks-empty">Задач с этим тегом нет</p>
-        )}
-      </div>
+        {!tasksQuery.isPending && tasks.length === 0 ? (
+          <p className="py-8 text-center text-muted-foreground">Задач с этим тегом нет</p>
+        ) : null}
+      </PageFade>
 
-      {detailsTask && (
-        <TaskDetails
-          key={detailsTask.id}
-          task={detailsTask}
-          onClose={() => setDetailsTaskId(null)}
-        />
-      )}
+      <AnimatePresence>
+        {detailsTask ? (
+          <TaskDetails
+            key={detailsTask.id}
+            task={detailsTask}
+            onClose={() => setDetailsTaskId(null)}
+          />
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
