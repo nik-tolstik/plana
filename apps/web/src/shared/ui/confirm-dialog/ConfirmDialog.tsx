@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Trash2Icon } from "lucide-react";
 
 import { cn } from "@/shared/lib/cn";
@@ -36,6 +36,14 @@ export function ConfirmDeleteDialog({
   onConfirm,
 }: ConfirmDeleteDialogProps) {
   const [busy, setBusy] = useState(false);
+  // Тексты фиксируются на момент открытия: во время exit-анимации родитель
+  // уже сбросил стейт (например, id удаляемого), и без фиксации заголовок
+  // пустеет поверх закрывающегося диалога.
+  const [texts, setTexts] = useState({ title, description, confirmLabel });
+
+  useEffect(() => {
+    if (open) setTexts({ title, description, confirmLabel });
+  }, [open, title, description, confirmLabel]);
 
   async function confirm() {
     setBusy(true);
@@ -51,8 +59,8 @@ export function ConfirmDeleteDialog({
     <Dialog open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
       <DialogWindow className="gap-4 sm:w-96" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogTitle>{texts.title}</DialogTitle>
+          <DialogDescription>{texts.description}</DialogDescription>
         </DialogHeader>
         <DialogFooter className="px-6">
           <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={busy}>
@@ -65,7 +73,7 @@ export function ConfirmDeleteDialog({
             disabled={busy}
           >
             <Trash2Icon className="size-4" />
-            {confirmLabel}
+            {texts.confirmLabel}
           </Button>
         </DialogFooter>
       </DialogWindow>

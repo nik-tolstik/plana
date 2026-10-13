@@ -45,34 +45,39 @@ export function CreateEntityDialog({
   folderId,
   onError,
 }: CreateEntityDialogProps) {
-  const texts = TITLES[kind];
   const [name, setName] = useState("");
   const [color, setColor] = useState<ListColor>("gray");
   const [icon, setIcon] = useState<EntityIcon | null>(null);
+  // Вид диалога фиксируется на момент открытия: во время exit-анимации
+  // родитель уже сбросил kind (null → «list»), и без фиксации мелькает
+  // заголовок «Новый проект» поверх закрывающейся «Новой папки».
+  const [openedKind, setOpenedKind] = useState<CreateEntityKind>(kind);
 
   const createList = useCreateList();
   const createFolder = useCreateFolder();
   const createTag = useCreateTag();
   const busy = createList.isPending || createFolder.isPending || createTag.isPending;
 
-  // Каждое открытие — чистая форма.
+  // Каждое открытие — чистая форма и актуальный kind.
   useEffect(() => {
     if (open) {
+      setOpenedKind(kind);
       setName("");
       setColor("gray");
       setIcon(null);
     }
-  }, [open]);
+  }, [open, kind]);
 
-  const styled = kind !== "folder";
+  const texts = TITLES[openedKind];
+  const styled = openedKind !== "folder";
 
   async function submit() {
     const trimmed = name.trim();
     if (trimmed.length === 0) return;
     try {
-      if (kind === "list") {
+      if (openedKind === "list") {
         await createList.mutateAsync({ name: trimmed, color, icon, folderId });
-      } else if (kind === "folder") {
+      } else if (openedKind === "folder") {
         await createFolder.mutateAsync({ name: trimmed });
       } else {
         await createTag.mutateAsync({ name: trimmed, color, icon });
