@@ -7,7 +7,7 @@ import { useSectionsQuery, useSidebarQuery } from "@/entities/list";
 import { useTasksQuery, useUserTimezone } from "@/entities/task";
 import { useCreateSection } from "@/features/structure-manage";
 import { QuickAdd } from "@/features/quick-add";
-import { Button, Input, PageFade, Skeleton } from "@/shared/ui";
+import { Input, PageFade, Skeleton } from "@/shared/ui";
 import { TaskDetails } from "@/widgets/task-details";
 import { groupBySections, TaskListView, useTaskDragReorder } from "@/widgets/task-list";
 

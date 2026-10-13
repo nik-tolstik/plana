@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PencilIcon } from "lucide-react";
+import { SettingsIcon } from "lucide-react";
 import { ENTITY_ICONS, type EntityIcon, type ListColor } from "@plana/shared";
 
 import { cn } from "@/shared/lib/cn";
@@ -16,6 +16,81 @@ export interface EntityStylePatch {
   name?: string;
   color?: ListColor;
   icon?: EntityIcon | null;
+}
+
+/** Сетка выбора цвета (radiogroup). Общая для поповера настроек и модалки создания. */
+export function StyleColorGrid({
+  value,
+  onChange,
+}: {
+  value: ListColor;
+  onChange: (color: ListColor) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Цвет">
+      {(Object.keys(ENTITY_COLORS) as ListColor[]).map((color) => (
+        <button
+          key={color}
+          type="button"
+          role="radio"
+          aria-checked={value === color}
+          title={color}
+          className={cn(
+            "size-6 cursor-pointer rounded-full transition-transform hover:scale-110",
+            value === color && "outline-2 outline-offset-2 outline-[var(--control-focus)]",
+          )}
+          style={{ background: ENTITY_COLORS[color] }}
+          onClick={() => onChange(color)}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Сетка выбора иконки; первый пункт — «без иконки» (цветная точка). */
+export function StyleIconGrid({
+  color,
+  value,
+  onChange,
+}: {
+  color: ListColor;
+  value: EntityIcon | null;
+  onChange: (icon: EntityIcon | null) => void;
+}) {
+  return (
+    <div className="grid grid-cols-7 gap-1">
+      <button
+        type="button"
+        title="Без иконки"
+        aria-pressed={value === null}
+        className={cn(
+          "flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-option-hover",
+          value === null && "bg-option-selected",
+        )}
+        onClick={() => onChange(null)}
+      >
+        <span className="size-2.5 rounded-full" style={{ background: ENTITY_COLORS[color] }} />
+      </button>
+      {ENTITY_ICONS.map((icon) => {
+        const Icon = ENTITY_ICON_COMPONENTS[icon];
+        return (
+          <button
+            key={icon}
+            type="button"
+            title={icon}
+            aria-pressed={value === icon}
+            className={cn(
+              "flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-option-hover",
+              value === icon && "bg-option-selected",
+            )}
+            onClick={() => onChange(icon)}
+          >
+            <Icon className="size-4 text-muted-foreground" />
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 interface EntityStylePopoverProps {
@@ -64,64 +139,16 @@ function StylePopoverContent({
 
       <div className="flex flex-col gap-1.5">
         <Label>Цвет</Label>
-        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Цвет">
-          {(Object.keys(ENTITY_COLORS) as ListColor[]).map((color) => (
-            <button
-              key={color}
-              type="button"
-              role="radio"
-              aria-checked={style.color === color}
-              title={color}
-              className={cn(
-                "size-6 cursor-pointer rounded-full transition-transform hover:scale-110",
-                style.color === color &&
-                  "outline-2 outline-offset-2 outline-[var(--control-focus)]",
-              )}
-              style={{ background: ENTITY_COLORS[color] }}
-              onClick={() => onChange({ color })}
-            />
-          ))}
-        </div>
+        <StyleColorGrid value={style.color} onChange={(color) => onChange({ color })} />
       </div>
 
       <div className="flex flex-col gap-1.5">
         <Label>Иконка</Label>
-        <div className="grid grid-cols-7 gap-1">
-          {/* Первый пункт — «без иконки» (цветная точка). */}
-          <button
-            type="button"
-            title="Без иконки"
-            aria-pressed={style.icon === null}
-            className={cn(
-              "flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-option-hover",
-              style.icon === null && "bg-option-selected",
-            )}
-            onClick={() => onChange({ icon: null })}
-          >
-            <span
-              className="size-2.5 rounded-full"
-              style={{ background: ENTITY_COLORS[style.color] }}
-            />
-          </button>
-          {ENTITY_ICONS.map((icon) => {
-            const Icon = ENTITY_ICON_COMPONENTS[icon];
-            return (
-              <button
-                key={icon}
-                type="button"
-                title={icon}
-                aria-pressed={style.icon === icon}
-                className={cn(
-                  "flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-option-hover",
-                  style.icon === icon && "bg-option-selected",
-                )}
-                onClick={() => onChange({ icon })}
-              >
-                <Icon className="size-4 text-muted-foreground" />
-              </button>
-            );
-          })}
-        </div>
+        <StyleIconGrid
+          color={style.color}
+          value={style.icon}
+          onChange={(icon) => onChange({ icon })}
+        />
       </div>
 
       <Button variant="secondary" size="sm" className="self-end" onClick={() => close()}>
@@ -152,7 +179,7 @@ export function EntityStylePopover({
           title={title}
           aria-label={title}
         >
-          <PencilIcon className="size-3.5" />
+          <SettingsIcon className="size-3.5" />
         </button>
       )}
     >

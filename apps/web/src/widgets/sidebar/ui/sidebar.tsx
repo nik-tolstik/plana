@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
+import { LayoutGroup, motion, useReducedMotion } from "motion/react";
 import {
   CalendarCheckIcon,
   CalendarRangeIcon,
   CheckCheckIcon,
-  ChevronUpIcon,
   FlameIcon,
+  FolderPlusIcon,
   ListTodoIcon,
   LogOutIcon,
   PlusIcon,
@@ -13,17 +14,19 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { Link, NavLink, useNavigate } from "react-router";
-import { useSidebarQuery, type ListDto } from "@/entities/list";
+import type { ListDto, PatchListDto } from "@plana/shared";
+import { useSidebarQuery } from "@/entities/list";
 import { useTagsQuery } from "@/entities/tag";
 import { useSessionStore } from "@/entities/user";
 import { logout } from "@/features/auth";
-import { useCreateTag } from "@/features/tag-manage";
-import { useCreateFolder, useCreateList, useUpdateList } from "@/features/structure-manage";
+import { useUpdateList } from "@/features/structure-manage";
 import { errorMessage } from "@/shared/lib/error-message";
-import { Checkbox, EntityMarker, Popover } from "@/shared/ui";
-import { AddForm } from "./add-form";
+import { cn } from "@/shared/lib/cn";
+import { Checkbox, Popover } from "@/shared/ui";
+import { CreateEntityDialog, type CreateEntityKind } from "./create-entity-dialog";
 import { FolderGroup } from "./folder-group";
 import { ListRow } from "./list-row";
+import { TagRow } from "./tag-row";
 import {
   loadHiddenSmartLists,
   saveHiddenSmartLists,
@@ -114,10 +117,33 @@ function SmartVisibilityButton({
   );
 }
 
-/** Заголовок секции сайдбара: маленький каптал + действие справа (плюс/шестерёнка). */
-function SectionHeader({ label, action }: { label: string; action?: React.ReactNode }) {
+interface SectionHeaderDndProps {
+  over: boolean;
+  onDragOver: (event: React.DragEvent) => void;
+  onDragLeave: () => void;
+  onDrop: (event: React.DragEvent) => void;
+}
+
+/** Заголовок секции сайдбара: маленький каптал + действия справа; может быть drop-целью. */
+function SectionHeader({
+  label,
+  action,
+  dnd,
+}: {
+  label: string;
+  action?: React.ReactNode;
+  dnd?: SectionHeaderDndProps;
+}) {
   return (
-    <div className="flex min-h-7 items-center justify-between gap-1 pl-2 pr-1">
+    <div
+      className={cn(
+        "flex min-h-7 items-center justify-between gap-1 rounded-md pl-2 pr-1 transition-colors",
+        dnd?.over && "bg-surface-selected",
+      )}
+      onDragOver={dnd?.onDragOver}
+      onDragLeave={dnd?.onDragLeave}
+      onDrop={dnd?.onDrop}
+    >
       <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         {label}
       </span>
@@ -175,7 +201,7 @@ function UserMenuItem({
   );
 }
 
-/** Карточка пользователя внизу сайдбара: поповер с привычками, настройками и выходом. */
+/** Карточка пользователя внизу сайдбара: поповер с настройками и выходом. */
 function UserCard({ onLogout }: { onLogout: () => void }) {
   const user = useSessionStore((state) => state.user);
   const navigate = useNavigate();
@@ -189,7 +215,7 @@ function UserCard({ onLogout }: { onLogout: () => void }) {
         <button
           {...triggerProps}
           type="button"
-          className="flex w-full cursor-pointer items-center gap-2 rounded-lg border border-border bg-card p-2 text-left transition-colors hover:bg-surface-hover"
+          className="flex w-full cursor-pointer items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-surface-hover"
           aria-label="Меню пользователя"
         >
           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
@@ -199,20 +225,11 @@ function UserCard({ onLogout }: { onLogout: () => void }) {
             <span className="block truncate text-sm font-medium">{user.name}</span>
             <span className="block truncate text-xs text-muted-foreground">{user.email}</span>
           </span>
-          <ChevronUpIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
         </button>
       )}
     >
       {({ close }) => (
         <div role="menu" aria-label="Меню пользователя" className="flex w-48 flex-col p-1">
-          <UserMenuItem
-            icon={<FlameIcon className="size-4" />}
-            label="Привычки"
-            onClick={() => {
-              close();
-              navigate("/habits");
-            }}
-          />
           <UserMenuItem
             icon={<SettingsIcon className="size-4" />}
             label="Настройки"
@@ -236,30 +253,34 @@ function UserCard({ onLogout }: { onLogout: () => void }) {
   );
 }
 
+/** Куда встанет тащимый список. */
+type DropTarget =
+  | { type: "list"; id: string; edge: "before" | "after" }
+  | { type: "folder"; id: string }
+  | { type: "root" }
+  | null;
+
 export function Sidebar() {
   const sidebarQuery = useSidebarQuery();
   const tagsQuery = useTagsQuery();
   const navigate = useNavigate();
-
-  const createList = useCreateList();
-  const createFolder = useCreateFolder();
   const updateList = useUpdateList();
-  const createTag = useCreateTag();
+  const prefersReducedMotion = useReducedMotion();
 
   const [error, setError] = useState<string | null>(null);
-  const [addingList, setAddingList] = useState(false);
-  const [addingTag, setAddingTag] = useState(false);
+  const [creating, setCreating] = useState<CreateEntityKind | null>(null);
   const [hiddenSmart, setHiddenSmart] = useState(() => loadHiddenSmartLists());
 
-  // DnD проектов: дроп проекта на проект создаёт папку с обоими.
-  // Идентификатор тащимого списка — в ref: dragover/drop приходят до
-  // нового рендера, замыкание со стейтом было бы устаревшим.
+  // DnD проектов: сортировка и перенос между корнем и папками. Идентификатор
+  // тащимого списка — в ref: dragover/drop приходят до нового рендера,
+  // замыкание со стейтом было бы устаревшим.
   const dragListIdRef = useRef<string | null>(null);
   const [dragListId, setDragListId] = useState<string | null>(null);
-  const [overListId, setOverListId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget>(null);
 
   const sidebar = sidebarQuery.data;
   const tags = tagsQuery.data ?? [];
+  const rootLists = sidebar?.rootLists ?? [];
 
   function toggleSmart(key: SmartListKey) {
     setHiddenSmart((current) => {
@@ -271,47 +292,94 @@ export function Sidebar() {
     });
   }
 
-  async function addList(name: string) {
-    try {
-      await createList.mutateAsync({ name });
-    } catch (cause) {
-      setError(errorMessage(cause));
-    }
-  }
-
-  async function addTag(name: string) {
-    try {
-      await createTag.mutateAsync({ name });
-    } catch (cause) {
-      setError(errorMessage(cause));
-    }
-  }
-
-  /** Дроп проекта на проект: создаём папку и кладём в неё оба списка. */
-  async function dropListOnList(targetId: string) {
-    const sourceId = dragListIdRef.current;
-    dragListIdRef.current = null;
-    setDragListId(null);
-    setOverListId(null);
-    if (!sourceId || sourceId === targetId) return;
-    try {
-      const folder = await createFolder.mutateAsync({ name: "Новая папка" });
-      await updateList.mutateAsync({ listId: sourceId, input: { folderId: folder.id } });
-      await updateList.mutateAsync({ listId: targetId, input: { folderId: folder.id } });
-    } catch (cause) {
-      setError(errorMessage(cause));
-    }
-  }
-
   async function onLogout() {
     await logout();
     navigate("/login", { replace: true });
   }
 
-  const rootLists = sidebar?.rootLists ?? [];
+  // --- DnD ---
+
+  const findList = (listId: string | null): ListDto | undefined => {
+    if (!sidebar || !listId) return undefined;
+    return [sidebar.inbox, ...sidebar.rootLists, ...sidebar.folders.flatMap((f) => f.lists)].find(
+      (candidate) => candidate.id === listId,
+    );
+  };
+
+  /**
+   * Соседи контейнера (null = корень) без тащимого списка. Для корня Inbox
+   * тоже сосед (API нумерует корень вместе с ним, position 0) — иначе
+   * пересчёт индекса вставки смещается на единицу.
+   */
+  const siblingsOf = (folderId: string | null, withoutId: string): ListDto[] => {
+    if (!sidebar) return [];
+    const lists =
+      folderId === null
+        ? [sidebar.inbox, ...sidebar.rootLists]
+        : (sidebar.folders.find((f) => f.id === folderId)?.lists ?? []);
+    return lists.filter((list) => list.id !== withoutId);
+  };
+
+  function clearDrag() {
+    dragListIdRef.current = null;
+    setDragListId(null);
+    setDropTarget(null);
+  }
+
+  /** Дроп на список: встаём выше/ниже цели в её контейнере. */
+  async function dropOnList(targetId: string, edge: "before" | "after") {
+    const sourceId = dragListIdRef.current;
+    clearDrag();
+    const source = findList(sourceId);
+    const target = findList(targetId);
+    if (!source || !target || source.id === target.id) return;
+    const containerId = target.folderId;
+    const siblings = siblingsOf(containerId, source.id);
+    const targetIndex = siblings.findIndex((list) => list.id === target.id);
+    if (targetIndex < 0) return;
+    const input: PatchListDto = { position: edge === "after" ? targetIndex + 1 : targetIndex };
+    if (source.folderId !== containerId) {
+      input.folderId = containerId;
+    }
+    try {
+      await updateList.mutateAsync({ listId: source.id, input });
+    } catch (cause) {
+      setError(errorMessage(cause));
+    }
+  }
+
+  /** Дроп на шапку папки: кладём тащимый список в конец этой папки. */
+  async function dropOnFolder(folderId: string) {
+    const sourceId = dragListIdRef.current;
+    clearDrag();
+    const source = findList(sourceId);
+    if (!source || source.folderId === folderId) return;
+    try {
+      await updateList.mutateAsync({ listId: source.id, input: { folderId } });
+    } catch (cause) {
+      setError(errorMessage(cause));
+    }
+  }
+
+  /** Дроп на заголовок «Проекты»: выносим список из папки в конец корня. */
+  async function dropOnRoot() {
+    const sourceId = dragListIdRef.current;
+    clearDrag();
+    const source = findList(sourceId);
+    if (!source || source.folderId === null) return;
+    try {
+      await updateList.mutateAsync({ listId: source.id, input: { folderId: null } });
+    } catch (cause) {
+      setError(errorMessage(cause));
+    }
+  }
+
   const listDnd = (list: ListDto) => ({
     dragging: dragListId === list.id,
-    over: overListId === list.id && dragListId !== null && dragListId !== list.id,
+    edge:
+      dropTarget?.type === "list" && dropTarget.id === list.id && dragListId !== null
+        ? dropTarget.edge
+        : null,
     onDragStart: (event: React.DragEvent) => {
       dragListIdRef.current = list.id;
       setDragListId(list.id);
@@ -323,19 +391,71 @@ export function Sidebar() {
       if (sourceId === null || sourceId === list.id) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = "move";
-      setOverListId(list.id);
+      const rect = event.currentTarget.getBoundingClientRect();
+      const edge: "before" | "after" =
+        event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+      setDropTarget((current) =>
+        current?.type === "list" && current.id === list.id && current.edge === edge
+          ? current
+          : { type: "list", id: list.id, edge },
+      );
     },
-    onDragLeave: () => setOverListId((current) => (current === list.id ? null : current)),
+    onDragLeave: () =>
+      setDropTarget((current) =>
+        current?.type === "list" && current.id === list.id ? null : current,
+      ),
     onDrop: (event: React.DragEvent) => {
       event.preventDefault();
-      void dropListOnList(list.id);
+      // edge считаем по геометрии на момент дропа: state мог не закоммититься.
+      const rect = event.currentTarget.getBoundingClientRect();
+      const edge: "before" | "after" =
+        event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+      void dropOnList(list.id, edge);
     },
-    onDragEnd: () => {
-      dragListIdRef.current = null;
-      setDragListId(null);
-      setOverListId(null);
+    onDragEnd: clearDrag,
+  });
+
+  const folderDnd = (folderId: string) => ({
+    overFolder: dropTarget?.type === "folder" && dropTarget.id === folderId && dragListId !== null,
+    onHeaderDragOver: (event: React.DragEvent) => {
+      const sourceId = dragListIdRef.current;
+      if (sourceId === null) return;
+      const source = findList(sourceId);
+      if (!source || source.folderId === folderId) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      setDropTarget({ type: "folder", id: folderId });
+    },
+    onHeaderDragLeave: () =>
+      setDropTarget((current) =>
+        current?.type === "folder" && current.id === folderId ? null : current,
+      ),
+    onHeaderDrop: (event: React.DragEvent) => {
+      event.preventDefault();
+      void dropOnFolder(folderId);
     },
   });
+
+  const rootDnd = {
+    over: dropTarget?.type === "root" && dragListId !== null,
+    onDragOver: (event: React.DragEvent) => {
+      const sourceId = dragListIdRef.current;
+      if (sourceId === null) return;
+      const source = findList(sourceId);
+      if (!source || source.folderId === null) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      setDropTarget({ type: "root" });
+    },
+    onDragLeave: () => setDropTarget((current) => (current?.type === "root" ? null : current)),
+    onDrop: (event: React.DragEvent) => {
+      event.preventDefault();
+      void dropOnRoot();
+    },
+  };
+
+  // layout-анимация перестановок; layoutId — плавный переезд между корнем и папкой.
+  const layoutEnabled = !prefersReducedMotion;
 
   return (
     <aside className="sticky top-0 flex h-dvh w-[264px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-border p-3 max-md:h-auto max-md:w-full max-md:border-r-0 max-md:border-b">
@@ -372,71 +492,82 @@ export function Sidebar() {
           </section>
         ) : null}
 
-        <section className="flex flex-col gap-0.5">
-          <SectionHeader
-            label="Проекты"
-            action={
-              <HeaderIconButton title="Добавить проект" onClick={() => setAddingList(true)}>
-                <PlusIcon className="size-3.5" />
-              </HeaderIconButton>
-            }
-          />
-          {rootLists.map((list) => (
-            <ListRow key={list.id} list={list} onError={setError} dnd={listDnd(list)} />
-          ))}
-          {sidebar?.folders.map((folder) => (
-            <FolderGroup key={folder.id} folder={folder} onError={setError} />
-          ))}
-          {addingList ? (
-            <AddForm
-              placeholder="Название проекта"
-              onSubmit={addList}
-              onCancel={() => setAddingList(false)}
+        <LayoutGroup>
+          <section className="flex flex-col gap-0.5">
+            <SectionHeader
+              label="Проекты"
+              dnd={rootDnd}
+              action={
+                <span className="flex gap-0.5">
+                  <HeaderIconButton title="Добавить папку" onClick={() => setCreating("folder")}>
+                    <FolderPlusIcon className="size-3.5" />
+                  </HeaderIconButton>
+                  <HeaderIconButton title="Добавить проект" onClick={() => setCreating("list")}>
+                    <PlusIcon className="size-3.5" />
+                  </HeaderIconButton>
+                </span>
+              }
             />
-          ) : null}
-          {rootLists.length === 0 && !sidebar?.folders.length ? (
-            <p className="px-2 py-1 text-xs text-muted-foreground">
-              Перетащите один проект на другой, чтобы собрать папку
-            </p>
-          ) : null}
-        </section>
+            {rootLists.map((list) => (
+              <motion.div
+                key={list.id}
+                layout={layoutEnabled}
+                layoutId={layoutEnabled ? list.id : undefined}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+              >
+                <ListRow list={list} onError={setError} dnd={listDnd(list)} />
+              </motion.div>
+            ))}
+            {sidebar?.folders.map((folder) => (
+              <FolderGroup
+                key={folder.id}
+                folder={folder}
+                onError={setError}
+                dndFor={listDnd}
+                folderDnd={folderDnd(folder.id)}
+              />
+            ))}
+          </section>
+        </LayoutGroup>
 
         <section className="flex flex-col gap-0.5">
           <SectionHeader
             label="Теги"
             action={
-              <HeaderIconButton title="Добавить тег" onClick={() => setAddingTag(true)}>
+              <HeaderIconButton title="Добавить тег" onClick={() => setCreating("tag")}>
                 <PlusIcon className="size-3.5" />
               </HeaderIconButton>
             }
           />
           {tags.map((tag) => (
-            <NavLink
-              className={({ isActive }) =>
-                `group flex min-h-8 items-center rounded-md pr-1 transition-colors hover:bg-surface-hover ${
-                  isActive ? "bg-surface-selected" : ""
-                }`
-              }
-              key={tag.id}
-              to={`/tag/${tag.id}`}
-            >
-              <span className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left">
-                <EntityMarker icon={tag.icon} color={tag.color} />
-                <span className="truncate">{tag.name}</span>
-              </span>
-            </NavLink>
+            <TagRow key={tag.id} tag={tag} onError={setError} />
           ))}
-          {addingTag ? (
-            <AddForm
-              placeholder="Название тега"
-              onSubmit={addTag}
-              onCancel={() => setAddingTag(false)}
-            />
-          ) : null}
         </section>
       </nav>
 
-      <UserCard onLogout={onLogout} />
+      <div className="flex flex-col gap-1">
+        <NavLink
+          className={({ isActive }) =>
+            `flex min-h-8 items-center rounded-md pr-1 transition-colors hover:bg-surface-hover ${
+              isActive ? "bg-surface-selected" : ""
+            }`
+          }
+          to="/habits"
+        >
+          <span className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left">
+            <FlameIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+            Привычки
+          </span>
+        </NavLink>
+        <UserCard onLogout={onLogout} />
+      </div>
+
+      <CreateEntityDialog
+        kind={creating ?? "list"}
+        open={creating !== null}
+        onOpenChange={(open) => !open && setCreating(null)}
+        onError={setError}
+      />
 
       {sidebarQuery.isPending ? <p className="text-sm text-muted-foreground">Загрузка…</p> : null}
       {sidebarQuery.isError ? (

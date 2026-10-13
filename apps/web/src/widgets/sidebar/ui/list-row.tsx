@@ -1,14 +1,16 @@
+import { useState } from "react";
 import { Link, useLocation } from "react-router";
-import { InboxIcon, XIcon } from "lucide-react";
+import { InboxIcon, Trash2Icon } from "lucide-react";
 import type { ListDto, PatchListDto } from "@plana/shared";
 import { useTrashList, useUpdateList } from "@/features/structure-manage";
 import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
-import { EntityMarker, EntityStylePopover } from "@/shared/ui";
+import { ConfirmDeleteDialog, EntityMarker, EntityStylePopover } from "@/shared/ui";
 
 export interface ListRowDndProps {
   dragging: boolean;
-  over: boolean;
+  /** Куда встанет тащимый список относительно этой строки: выше/ниже. */
+  edge: "before" | "after" | null;
   onDragStart: (event: React.DragEvent) => void;
   onDragOver: (event: React.DragEvent) => void;
   onDragLeave: () => void;
@@ -19,7 +21,7 @@ export interface ListRowDndProps {
 interface ListRowProps {
   list: ListDto;
   onError: (message: string) => void;
-  /** Перетаскивание корневых проектов: дроп на другой проект создаёт папку. */
+  /** Перетаскивание проектов: сортировка и перенос между папкой и корнем. */
   dnd?: ListRowDndProps;
 }
 
@@ -27,6 +29,7 @@ interface ListRowProps {
 export function ListRow({ list, onError, dnd }: ListRowProps) {
   const { pathname } = useLocation();
   const active = pathname === `/list/${list.id}`;
+  const [confirming, setConfirming] = useState(false);
 
   const updateList = useUpdateList();
   const trashList = useTrashList();
@@ -39,26 +42,14 @@ export function ListRow({ list, onError, dnd }: ListRowProps) {
     }
   }
 
-  async function onDelete() {
-    if (!window.confirm(`Удалить список «${list.name}»? Задачи попадут в корзину.`)) {
-      return;
-    }
-    try {
-      await trashList.mutateAsync(list.id);
-    } catch (cause) {
-      onError(errorMessage(cause));
-    }
-  }
-
   const editable = list.kind !== "inbox";
 
   return (
     <div
       className={cn(
-        "group flex min-h-8 items-center rounded-md pr-1 transition-colors hover:bg-surface-hover",
+        "group relative flex min-h-8 items-center rounded-md pr-1 transition-colors hover:bg-surface-hover",
         active && "bg-surface-selected",
         dnd?.dragging && "opacity-40",
-        dnd?.over && "bg-surface-selected ring-1 ring-primary",
       )}
       draggable={dnd !== undefined}
       onDragStart={dnd?.onDragStart}
@@ -67,6 +58,13 @@ export function ListRow({ list, onError, dnd }: ListRowProps) {
       onDrop={dnd?.onDrop}
       onDragEnd={dnd?.onDragEnd}
     >
+      {/* Индикатор вставки при переупорядочивании. */}
+      {dnd?.edge === "before" ? (
+        <span className="pointer-events-none absolute inset-x-1 top-0 h-0.5 rounded-full bg-primary" />
+      ) : null}
+      {dnd?.edge === "after" ? (
+        <span className="pointer-events-none absolute inset-x-1 bottom-0 h-0.5 rounded-full bg-primary" />
+      ) : null}
       <Link
         className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left"
         to={`/list/${list.id}`}
@@ -89,12 +87,25 @@ export function ListRow({ list, onError, dnd }: ListRowProps) {
             className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
             type="button"
             title="Удалить"
-            onClick={onDelete}
+            onClick={() => setConfirming(true)}
           >
-            <XIcon className="size-3.5" />
+            <Trash2Icon className="size-3.5" />
           </button>
         </span>
       ) : null}
+      <ConfirmDeleteDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={`Удалить проект «${list.name}»?`}
+        description="Список и его задачи попадут в корзину."
+        onConfirm={async () => {
+          try {
+            await trashList.mutateAsync(list.id);
+          } catch (cause) {
+            onError(errorMessage(cause));
+          }
+        }}
+      />
     </div>
   );
 }

@@ -6,11 +6,11 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   RotateCcwIcon,
-  XIcon,
+  Trash2Icon,
 } from "lucide-react";
 import type { HabitWithEntriesDto } from "@plana/shared";
 import { useDeleteHabit, useUpdateHabit } from "@/features/habit-manage";
-import { AnimatedListItem, staggerDelayMs } from "@/shared/ui";
+import { AnimatedListItem, ConfirmDeleteDialog, staggerDelayMs } from "@/shared/ui";
 import { HabitCard } from "./habit-card";
 import { monthOf, monthTitle, shiftMonth } from "../model/calendar";
 import type { MonthCursor } from "../model/calendar";
@@ -26,6 +26,7 @@ export function HabitsList({ habits, today }: HabitsListProps) {
   const remove = useDeleteHabit();
   const [cursor, setCursor] = useState<MonthCursor>(() => monthOf(today));
   const [showArchived, setShowArchived] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
 
   const active = habits.filter((habit) => habit.archivedAt === null);
@@ -113,13 +114,9 @@ export function HabitsList({ habits, today }: HabitsListProps) {
                         disabled={remove.isPending}
                         title="Удалить навсегда"
                         type="button"
-                        onClick={() => {
-                          if (window.confirm(`Удалить «${habit.name}» со всей историей?`)) {
-                            void remove.mutateAsync(habit.id);
-                          }
-                        }}
+                        onClick={() => setConfirmingId(habit.id)}
                       >
-                        <XIcon className="size-4" />
+                        <Trash2Icon className="size-4" />
                       </button>
                     </div>
                   ))}
@@ -129,6 +126,19 @@ export function HabitsList({ habits, today }: HabitsListProps) {
           </AnimatePresence>
         </section>
       ) : null}
+
+      <ConfirmDeleteDialog
+        open={confirmingId !== null}
+        onOpenChange={(open) => !open && setConfirmingId(null)}
+        title={`Удалить «${archived.find((habit) => habit.id === confirmingId)?.name ?? ""}»?`}
+        description="Привычка и вся её история отметок будут удалены навсегда."
+        confirmLabel="Удалить навсегда"
+        onConfirm={async () => {
+          if (confirmingId !== null) {
+            await remove.mutateAsync(confirmingId).catch(() => undefined);
+          }
+        }}
+      />
     </div>
   );
 }

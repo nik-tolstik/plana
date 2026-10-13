@@ -5,6 +5,7 @@ export * from "./calendar/index.js";
 export * from "./card/index.js";
 export * from "./checkbox/index.js";
 export * from "./context-menu/index.js";
+export * from "./confirm-dialog/index.js";
 export * from "./date-time-picker/index.js";
 export * from "./dialog/index.js";
 export * from "./entity-visuals/index.js";
