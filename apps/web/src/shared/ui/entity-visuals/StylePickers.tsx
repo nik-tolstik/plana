@@ -3,7 +3,7 @@ import { SettingsIcon } from "lucide-react";
 import { ENTITY_ICONS, type EntityIcon, type ListColor } from "@plana/shared";
 
 import { cn } from "@/shared/lib/cn";
-import { Button, Input, Label, Popover } from "@/shared/ui";
+import { Input, Label, Popover } from "@/shared/ui";
 import { ENTITY_COLORS, ENTITY_ICON_COMPONENTS } from "./EntityVisuals";
 
 export interface EntityStyle {
@@ -102,12 +102,7 @@ interface EntityStylePopoverProps {
 }
 
 /** Контент поповера; монтируется при каждом открытии — имя стартует актуальным. */
-function StylePopoverContent({
-  style,
-  onChange,
-  nameDisabled,
-  close,
-}: EntityStylePopoverProps & { close: () => void }) {
+function StylePopoverContent({ style, onChange, nameDisabled }: EntityStylePopoverProps) {
   const [name, setName] = useState(style.name);
 
   function commitName() {
@@ -150,10 +145,6 @@ function StylePopoverContent({
           onChange={(icon) => onChange({ icon })}
         />
       </div>
-
-      <Button variant="secondary" size="sm" className="self-end" onClick={() => close()}>
-        Готово
-      </Button>
     </div>
   );
 }
@@ -183,13 +174,12 @@ export function EntityStylePopover({
         </button>
       )}
     >
-      {({ close }) => (
+      {() => (
         <StylePopoverContent
           style={style}
           onChange={onChange}
           title={title}
           nameDisabled={nameDisabled}
-          close={close}
         />
       )}
     </Popover>
