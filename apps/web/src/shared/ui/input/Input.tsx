@@ -4,9 +4,11 @@ import { cn } from "@/shared/lib/cn";
 
 type InputProps = Omit<React.ComponentProps<"input">, "prefix"> & {
   prefix?: React.ReactNode;
+  /** Контент справа (кнопки настроек); элементам для кликов нужен pointer-events-auto. */
+  suffix?: React.ReactNode;
 };
 
-function Input({ className, prefix, type, ...props }: InputProps) {
+function Input({ className, prefix, suffix, type, ...props }: InputProps) {
   return (
     <div className="relative w-full">
       {prefix ? (
@@ -17,6 +19,9 @@ function Input({ className, prefix, type, ...props }: InputProps) {
           {prefix}
         </span>
       ) : null}
+      {suffix ? (
+        <span className="absolute inset-y-0 right-1 z-10 inline-flex items-center">{suffix}</span>
+      ) : null}
       <input
         type={type}
         data-slot="input"
@@ -25,6 +30,7 @@ function Input({ className, prefix, type, ...props }: InputProps) {
           "focus-visible:bg-control focus-visible:ring-2 focus-visible:ring-control-focus/30 ring-inset",
           "aria-invalid:ring-2 aria-invalid:ring-destructive/35 dark:aria-invalid:ring-destructive/45",
           prefix && "pl-10",
+          suffix && "pr-24",
           className,
         )}
         {...props}

@@ -62,7 +62,13 @@ export function SmartPage({ smart }: SmartPageProps) {
           <p className="text-destructive">Не удалось загрузить задачи</p>
         ) : null}
 
-        <TaskListView groups={groups} today={today} onOpenDetails={setDetailsTaskId} />
+        {/* Дата на «Сегодня»/«Завтра» задаётся страницей — чип даты в строках избыточен. */}
+        <TaskListView
+          groups={groups}
+          today={today}
+          hideDateChip={smart === "today" || smart === "tomorrow"}
+          onOpenDetails={setDetailsTaskId}
+        />
 
         {!tasksQuery.isPending && tasks.length === 0 ? (
           <p className="py-8 text-center text-muted-foreground">

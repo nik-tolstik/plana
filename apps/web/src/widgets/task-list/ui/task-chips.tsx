@@ -5,18 +5,11 @@ import {
   TASK_PRIORITY_LABELS_RU,
   type PatchTaskDto,
   type TaskDto,
-  type TaskPriority,
 } from "@plana/shared";
 import { useTagsQuery } from "@/entities/tag";
 import { cn } from "@/shared/lib/cn";
-import { Checkbox, DateTimePicker, ENTITY_COLORS, Popover } from "@/shared/ui";
-
-export const PRIORITY_CLASS: Record<TaskPriority, string> = {
-  none: "",
-  low: "text-priority-low",
-  medium: "text-priority-medium",
-  high: "text-priority-high",
-};
+import { PRIORITY_CLASS } from "@/shared/lib/priority-class";
+import { DateTimePicker, ENTITY_COLORS, Popover } from "@/shared/ui";
 
 interface TaskChipProps {
   task: TaskDto;
@@ -110,7 +103,6 @@ export function TaskTagsChip({ task, onPatch }: TaskChipProps) {
                 )}
                 onClick={() => toggle(tag.name)}
               >
-                <Checkbox size="sm" checked={selected} tabIndex={-1} aria-hidden />
                 <span
                   aria-hidden
                   className="size-2 shrink-0 rounded-full"

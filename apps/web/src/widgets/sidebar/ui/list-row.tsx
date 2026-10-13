@@ -5,6 +5,7 @@ import type { ListDto, PatchListDto } from "@plana/shared";
 import { useTrashList, useUpdateList } from "@/features/structure-manage";
 import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
+import { TASK_DRAG_MIME } from "@/shared/lib/task-drag-mime";
 import { ConfirmDeleteDialog, EntityMarker, EntityStylePopover } from "@/shared/ui";
 
 export interface ListRowDndProps {
@@ -18,15 +19,25 @@ export interface ListRowDndProps {
   onDragEnd: () => void;
 }
 
+/** Приём перетаскиваемой задачи: дроп переносит её в этот список. */
+export interface ListRowTaskDropProps {
+  over: boolean;
+  onDragOver: (event: React.DragEvent) => void;
+  onDragLeave: () => void;
+  onDrop: (event: React.DragEvent) => void;
+}
+
 interface ListRowProps {
   list: ListDto;
   onError: (message: string) => void;
   /** Перетаскивание проектов: сортировка и перенос между папкой и корнем. */
   dnd?: ListRowDndProps;
+  /** Приём задач, перетащенных со страницы списка. */
+  taskDrop?: ListRowTaskDropProps;
 }
 
 /** Строка списка в сайдбаре: переход, настройки (имя/цвет/иконка), удаление. */
-export function ListRow({ list, onError, dnd }: ListRowProps) {
+export function ListRow({ list, onError, dnd, taskDrop }: ListRowProps) {
   const { pathname } = useLocation();
   const active = pathname === `/list/${list.id}`;
   const [confirming, setConfirming] = useState(false);
@@ -44,18 +55,38 @@ export function ListRow({ list, onError, dnd }: ListRowProps) {
 
   const editable = list.kind !== "inbox";
 
+  // Обработчики двух источников DnD на одной строке: сортировка списков и
+  // перенос задач. Кто вызвал preventDefault в dragover — тот и цель.
+  const combinedDragOver = (event: React.DragEvent) => {
+    dnd?.onDragOver(event);
+    if (!event.defaultPrevented) {
+      taskDrop?.onDragOver(event);
+    }
+  };
+  const combinedDrop = (event: React.DragEvent) => {
+    if (event.dataTransfer.types.includes(TASK_DRAG_MIME)) {
+      taskDrop?.onDrop(event);
+      return;
+    }
+    dnd?.onDrop(event);
+  };
+
   return (
     <div
       className={cn(
         "group relative flex min-h-8 items-center rounded-md pr-1 transition-colors hover:bg-surface-hover",
         active && "bg-surface-selected",
         dnd?.dragging && "opacity-40",
+        taskDrop?.over && "bg-surface-selected ring-1 ring-primary",
       )}
       draggable={dnd !== undefined}
       onDragStart={dnd?.onDragStart}
-      onDragOver={dnd?.onDragOver}
-      onDragLeave={dnd?.onDragLeave}
-      onDrop={dnd?.onDrop}
+      onDragOver={combinedDragOver}
+      onDragLeave={() => {
+        dnd?.onDragLeave();
+        taskDrop?.onDragLeave();
+      }}
+      onDrop={combinedDrop}
       onDragEnd={dnd?.onDragEnd}
     >
       {/* Индикатор вставки при переупорядочивании. */}

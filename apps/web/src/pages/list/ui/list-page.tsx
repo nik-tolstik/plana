@@ -4,7 +4,7 @@ import { todayInZone } from "@plana/shared";
 import { useSidebarQuery } from "@/entities/list";
 import { useTasksQuery, useUserTimezone } from "@/entities/task";
 import { QuickAdd } from "@/features/quick-add";
-import { PageFade, Skeleton } from "@/shared/ui";
+import { EntityMarker, PageFade, Skeleton } from "@/shared/ui";
 import { TaskDetails } from "@/widgets/task-details";
 import { TaskListView, useTaskDragReorder } from "@/widgets/task-list";
 import {
@@ -81,14 +81,21 @@ export function ListPage() {
     <div className="flex w-full items-start gap-6">
       <PageFade className="min-w-0 flex-1 flex-col gap-3">
         <header className="mb-3 flex items-center gap-1">
-          <h1 className="min-w-0 flex-1 truncate text-xl font-semibold">
-            {list?.emoji ? `${list.emoji} ` : ""}
-            {list?.name ?? "…"}
+          <h1 className="flex min-w-0 flex-1 items-center gap-2 truncate text-xl font-semibold">
+            {/* Маркер проекта как в сайдбаре: эмодзи или иконка в цвете. */}
+            {list?.emoji ? (
+              <span aria-hidden className="shrink-0 text-xl leading-none">
+                {list.emoji}
+              </span>
+            ) : list ? (
+              <EntityMarker icon={list.icon} color={list.color} />
+            ) : null}
+            <span className="truncate">{list?.name ?? "…"}</span>
           </h1>
           <ListDisplaySettingsButton settings={display} onChange={changeDisplay} />
         </header>
 
-        <QuickAdd defaultListId={listId} />
+        <QuickAdd listId={listId} />
 
         {tasksQuery.isPending ? (
           <div className="flex flex-col gap-2">

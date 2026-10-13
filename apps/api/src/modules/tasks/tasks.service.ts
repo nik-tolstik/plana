@@ -194,6 +194,17 @@ export class TasksService {
     return (last?.position ?? -POSITION_STEP) + POSITION_STEP;
   }
 
+  /** Позиция перед первой задачей контейнера: новые задачи встают в начало. */
+  private async firstPosition(listId: string, sectionId: string | null): Promise<number> {
+    const [first] = await this.db
+      .select({ position: tasks.position })
+      .from(tasks)
+      .where(and(this.containerCondition(listId, sectionId), isNull(tasks.trashedAt)))
+      .orderBy(asc(tasks.position))
+      .limit(1);
+    return (first?.position ?? 0) - POSITION_STEP;
+  }
+
   /**
    * Позиция сразу после задачи-якоря в том же контейнере (список + секция).
    * Чужой якорь или другой контейнер — игнорируем, задача уходит в конец.
@@ -242,8 +253,8 @@ export class TasksService {
     const position =
       dto.afterTaskId !== undefined
         ? ((await this.positionAfter(userId, listId, sectionId, dto.afterTaskId)) ??
-          (await this.nextPosition(listId, sectionId)))
-        : await this.nextPosition(listId, sectionId);
+          (await this.firstPosition(listId, sectionId)))
+        : await this.firstPosition(listId, sectionId);
     const [created] = await this.db
       .insert(tasks)
       .values({
@@ -863,6 +874,85 @@ export class TasksService {
   async removeSubtask(userId: string, subtaskId: string): Promise<void> {
     const subtask = await this.findOwnedSubtask(userId, subtaskId);
     await this.db.delete(subtasks).where(eq(subtasks.id, subtask.id));
+  }
+
+  /**
+   * Задача становится подзадачей другой задачи: переносим title и статус
+   * выполнения, подзадачи конвертируемой задачи переезжают вместе с ней.
+   * Мета-поля (дата/приоритет/теги/описание) модели подзадач недоступны —
+   * конвертация их отбрасывает, исходная задача удаляется физически.
+   */
+  async nestTask(userId: string, taskId: string, parentTaskId: string): Promise<TaskDto> {
+    if (taskId === parentTaskId) {
+      throw new BadRequestException({ description: "Задача не может быть подзадачей самой себя" });
+    }
+    const task = await this.findOwned(userId, taskId);
+    const parent = await this.findOwned(userId, parentTaskId);
+    if (task.listId !== parent.listId) {
+      throw new BadRequestException({
+        description: "Подзадачей можно сделать задачу из того же списка",
+      });
+    }
+
+    // Гидратация после транзакции: до коммита подзадачи не видны вне tx.
+    const updatedParent = await this.db.transaction(async (tx) => {
+      const [last] = await tx
+        .select({ position: subtasks.position })
+        .from(subtasks)
+        .where(eq(subtasks.taskId, parent.id))
+        .orderBy(desc(subtasks.position))
+        .limit(1);
+      let position = (last?.position ?? -POSITION_STEP) + POSITION_STEP;
+      await tx.insert(subtasks).values({
+        taskId: parent.id,
+        title: task.title,
+        done: task.completedAt !== null,
+        position,
+      });
+      position += POSITION_STEP;
+      const moved = await tx
+        .select({ id: subtasks.id })
+        .from(subtasks)
+        .where(eq(subtasks.taskId, task.id))
+        .orderBy(asc(subtasks.position));
+      for (const row of moved) {
+        await tx
+          .update(subtasks)
+          .set({ taskId: parent.id, position })
+          .where(eq(subtasks.id, row.id));
+        position += POSITION_STEP;
+      }
+      await tx.delete(tasks).where(eq(tasks.id, task.id));
+      return parent;
+    });
+    return this.hydrateTask(updatedParent);
+  }
+
+  /**
+   * Подзадача становится отдельной задачей: создаём задачу сразу после
+   * родительской (та же позиционная семантика, что у afterTaskId) и удаляем
+   * подзадачу. Статус выполнения переносится в completedAt.
+   */
+  async promoteSubtask(userId: string, subtaskId: string): Promise<TaskDto> {
+    const subtask = await this.findOwnedSubtask(userId, subtaskId);
+    const parent = await this.findOwned(userId, subtask.taskId);
+    const position = await this.positionAfter(userId, parent.listId, parent.sectionId, parent.id);
+    const [created] = await this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(tasks)
+        .values({
+          userId,
+          listId: parent.listId,
+          sectionId: parent.sectionId,
+          title: subtask.title,
+          position: position ?? (await this.nextPosition(parent.listId, parent.sectionId)),
+          completedAt: subtask.done ? new Date() : null,
+        })
+        .returning();
+      await tx.delete(subtasks).where(eq(subtasks.id, subtask.id));
+      return [row!];
+    });
+    return this.hydrateTask(created);
   }
 
   private async findOwnedSubtask(userId: string, subtaskId: string): Promise<SubtaskRow> {

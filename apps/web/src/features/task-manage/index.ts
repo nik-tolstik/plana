@@ -3,6 +3,8 @@ export {
   useCreateSubtask,
   useCreateTask,
   useDeleteSubtask,
+  useNestTask,
+  usePromoteSubtask,
   useRestoreTask,
   useTrashTask,
   useUncompleteTask,

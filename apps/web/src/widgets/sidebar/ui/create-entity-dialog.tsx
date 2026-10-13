@@ -20,9 +20,9 @@ import {
 export type CreateEntityKind = "list" | "folder" | "tag";
 
 const TITLES: Record<CreateEntityKind, { title: string; submit: string; label: string }> = {
-  list: { title: "Новый проект", submit: "Создать проект", label: "Название проекта" },
-  folder: { title: "Новая папка", submit: "Создать папку", label: "Название папки" },
-  tag: { title: "Новый тег", submit: "Создать тег", label: "Название тега" },
+  list: { title: "Новый проект", submit: "Создать", label: "Название проекта" },
+  folder: { title: "Новая папка", submit: "Создать", label: "Название папки" },
+  tag: { title: "Новый тег", submit: "Создать", label: "Название тега" },
 };
 
 interface CreateEntityDialogProps {

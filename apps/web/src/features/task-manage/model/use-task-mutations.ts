@@ -6,6 +6,8 @@ import {
   apiCompleteTask,
   apiCreateSubtask,
   apiCreateTask,
+  apiNestTask,
+  apiPromoteSubtask,
   apiRestoreTask,
   apiTrashTask,
   apiUncompleteTask,
@@ -105,6 +107,23 @@ export function useDeleteSubtask() {
   const invalidate = useInvalidateTasks();
   return useMutation({
     mutationFn: apiDeleteSubtask,
+    onSuccess: invalidate,
+  });
+}
+
+export function useNestTask() {
+  const invalidate = useInvalidateTasks();
+  return useMutation({
+    mutationFn: ({ taskId, parentTaskId }: { taskId: string; parentTaskId: string }) =>
+      apiNestTask(taskId, parentTaskId),
+    onSuccess: invalidate,
+  });
+}
+
+export function usePromoteSubtask() {
+  const invalidate = useInvalidateTasks();
+  return useMutation({
+    mutationFn: apiPromoteSubtask,
     onSuccess: invalidate,
   });
 }

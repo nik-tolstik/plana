@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { XIcon } from "lucide-react";
+import { CornerUpRightIcon, XIcon } from "lucide-react";
 import type { TaskDto } from "@plana/shared";
-import { useDeleteSubtask, useUpdateSubtask } from "@/features/task-manage";
+import { useDeleteSubtask, usePromoteSubtask, useUpdateSubtask } from "@/features/task-manage";
 import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
 import { Checkbox } from "@/shared/ui";
@@ -11,13 +11,14 @@ interface SubtasksBlockProps {
 }
 
 /**
- * Чеклист подзадач: отметить, удалить. Новые подзадачи добавляются
- * Shift+Enter в инлайн-режиме названия задачи (см. TaskRow).
+ * Чеклист подзадач: отметить, вынести в отдельную задачу, удалить.
+ * Новые подзадачи добавляются Shift+Enter в инлайн-режиме названия задачи.
  */
 export function SubtasksBlock({ task }: SubtasksBlockProps) {
   const [error, setError] = useState<string | null>(null);
   const updateSubtask = useUpdateSubtask();
   const deleteSubtask = useDeleteSubtask();
+  const promoteSubtask = usePromoteSubtask();
 
   async function toggle(subtaskId: string, done: boolean) {
     try {
@@ -35,12 +36,21 @@ export function SubtasksBlock({ task }: SubtasksBlockProps) {
     }
   }
 
+  /** Подзадача становится отдельной задачей сразу после родительской. */
+  async function promote(subtaskId: string) {
+    try {
+      await promoteSubtask.mutateAsync(subtaskId);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    }
+  }
+
   return (
     <div className="flex flex-col gap-1 px-2 pb-2">
       <ul className="flex flex-col gap-0.5">
         {task.subtasks.map((subtask) => (
           <li
-            className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-surface-hover"
+            className="group/subtask flex items-center gap-2 rounded-md px-2 py-1"
             key={subtask.id}
           >
             <Checkbox
@@ -57,14 +67,24 @@ export function SubtasksBlock({ task }: SubtasksBlockProps) {
             >
               {subtask.title}
             </span>
-            <button
-              className="shrink-0 cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
-              title="Удалить"
-              type="button"
-              onClick={() => void remove(subtask.id)}
-            >
-              <XIcon className="size-3" />
-            </button>
+            <span className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover/subtask:opacity-100 focus-within:opacity-100">
+              <button
+                className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+                title="Сделать отдельной задачей"
+                type="button"
+                onClick={() => void promote(subtask.id)}
+              >
+                <CornerUpRightIcon className="size-3" />
+              </button>
+              <button
+                className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+                title="Удалить"
+                type="button"
+                onClick={() => void remove(subtask.id)}
+              >
+                <XIcon className="size-3" />
+              </button>
+            </span>
           </li>
         ))}
       </ul>

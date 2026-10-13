@@ -78,3 +78,13 @@ export function apiUpdateSubtask(
 export function apiDeleteSubtask(subtaskId: string): Promise<void> {
   return apiClient.deleteVoid(`/v1/subtasks/${subtaskId}`);
 }
+
+/** Задача становится подзадачей родительской задачи (DnD «внутрь»). */
+export function apiNestTask(taskId: string, parentTaskId: string): Promise<TaskDto> {
+  return apiClient.post(`/v1/tasks/${taskId}/nest`, taskSchema, { parentTaskId });
+}
+
+/** Подзадача становится отдельной задачей сразу после родительской. */
+export function apiPromoteSubtask(subtaskId: string): Promise<TaskDto> {
+  return apiClient.post(`/v1/subtasks/${subtaskId}/promote`, taskSchema, {});
+}

@@ -3,7 +3,6 @@ import {
   CalendarIcon,
   CheckIcon,
   FlagIcon,
-  GripVerticalIcon,
   ListIcon,
   RepeatIcon,
   RotateCcwIcon,
@@ -32,23 +31,24 @@ import {
 } from "@/features/task-manage";
 import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
+import { PRIORITY_CLASS } from "@/shared/lib/priority-class";
 import { Checkbox, ContextMenu, EntityMarker, type ContextMenuItem } from "@/shared/ui";
-import { PRIORITY_CLASS, TaskDateChip, TaskPriorityChip, TaskTagsChip } from "./task-chips";
+import { TaskDateChip, TaskPriorityChip, TaskTagsChip } from "./task-chips";
 import { SubtasksBlock } from "./subtasks-block";
 import { taskDueLabel } from "../model/grouping";
 import type { TaskEditingState } from "../model/editing";
-import type { TaskDragProps } from "../model/use-drag-reorder";
+import { TASK_DRAG_MIME, type TaskDragProps } from "../model/use-drag-reorder";
 
 interface TaskRowProps {
   task: TaskDto;
   today: string;
   /** Дата уже прошла — подсветить. */
   showOverdue?: boolean;
+  /** Страница задаёт дату («Сегодня»/«Завтра») — чип даты избыточен. */
+  hideDateChip?: boolean;
   onOpenDetails: (taskId: string) => void;
   /** Перетаскивание (только страницы списков). */
   dnd?: TaskDragProps;
-  /** Задержка stagger-появления (передаётся группой). */
-  delayMs?: number;
   /** Инлайн-ввод (владелец состояния — TaskListView). */
   editing?: TaskEditingState | null;
   onEditingChange?: (editing: TaskEditingState | null) => void;
@@ -133,9 +133,9 @@ export function TaskRow({
   task,
   today,
   showOverdue = true,
+  hideDateChip = false,
   onOpenDetails,
   dnd,
-  delayMs = 0,
   editing = null,
   onEditingChange = () => undefined,
 }: TaskRowProps) {
@@ -143,6 +143,9 @@ export function TaskRow({
   const [titleDraft, setTitleDraft] = useState(task.title);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Завершение: сначала проигрываем галочку и схлопывание строки,
+  // только потом PATCH — иначе задача исчезает из списка раньше анимации.
+  const [completing, setCompleting] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const sidebarQuery = useSidebarQuery();
   const timezone = useUserTimezone();
@@ -168,16 +171,24 @@ export function TaskRow({
     task.dueDate < today &&
     task.completedAt === null &&
     task.trashedAt === null;
-  const dropping = dnd?.overId === task.id && dnd.draggingId !== task.id;
+  const done = completing || task.completedAt !== null;
+  const overZone = dnd?.over?.id === task.id && dnd.draggingId !== task.id ? dnd.over.zone : null;
 
   async function toggleComplete() {
     try {
       if (task.completedAt === null) {
+        setCompleting(true);
+        if (!prefersReducedMotion) {
+          // Галочка + схлопывание строки успевают проиграться до PATCH.
+          await new Promise((resolve) => setTimeout(resolve, 450));
+        }
         await complete.mutateAsync(task.id);
+        setCompleting(false);
       } else {
         await uncomplete.mutateAsync(task.id);
       }
     } catch (cause) {
+      setCompleting(false);
       setError(errorMessage(cause));
     }
   }
@@ -289,7 +300,7 @@ export function TaskRow({
     }
   }
 
-  /** Общий PATCH для действий контекстного меню (дата/приоритет/список/крепление). */
+  /** Общий PATCH для действий контекстного меню (дата/приоритет/список). */
   async function patchTask(input: PatchTaskDto) {
     try {
       await update.mutateAsync({ taskId: task.id, ...input });
@@ -400,7 +411,7 @@ export function TaskRow({
 
   return (
     // li — обычный (не motion): HTML5 drag-события не должны перехватываться
-    // motion-жестами; появление строки анимирует вложенный motion.div.
+    // motion-жестами; перестановки и уход строки анимирует вложенный motion.div.
     // Действия над задачей — в контекстном меню по правому клику.
     <ContextMenu items={menuItems}>
       {(menuProps) => (
@@ -418,34 +429,50 @@ export function TaskRow({
             }
           }}
           className={cn(
-            "group relative flex flex-col rounded-lg transition-colors hover:bg-surface-hover",
+            "group relative flex flex-col rounded-lg",
             task.completedAt !== null && "opacity-60",
             dnd?.draggingId === task.id && "opacity-40",
-            dropping && "shadow-[inset_0_2px_0_0_var(--primary)]",
+            overZone === "inside" && "bg-surface-selected",
           )}
-          draggable={dnd !== undefined && mode === null}
-          onDragStart={dnd ? (event) => dnd.onDragStart(task, event) : undefined}
-          onDragOver={dnd ? (event) => dnd.onDragOver(task, event) : undefined}
-          onDrop={dnd ? (event) => dnd.onDrop(task, event) : undefined}
-          onDragEnd={dnd ? dnd.onDragEnd : undefined}
+          // Строка всегда тащится (кроме правки): перенос между списками
+          // броском на сайдбар доступен и на умных страницах.
+          draggable={mode === null}
+          onDragStart={(event) => {
+            if (dnd) {
+              dnd.onDragStart(task, event);
+              return;
+            }
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData(TASK_DRAG_MIME, task.id);
+            event.dataTransfer.setData("text/plain", task.id);
+          }}
+          onDragOver={dnd?.onDragOver ? (event) => dnd.onDragOver(task, event) : undefined}
+          onDrop={dnd?.onDrop ? (event) => dnd.onDrop(task, event) : undefined}
+          onDragEnd={dnd?.onDragEnd}
         >
+          {/* Линии вставки при перетаскивании; центральная зона подсвечивает строку. */}
+          {overZone === "before" ? (
+            <span className="pointer-events-none absolute inset-x-1 top-0 z-10 h-0.5 rounded-full bg-primary" />
+          ) : null}
+          {overZone === "after" ? (
+            <span className="pointer-events-none absolute inset-x-1 bottom-0 z-10 h-0.5 rounded-full bg-primary" />
+          ) : null}
           <motion.div
+            // layout: перестановка DnD переезжает плавно, а не скачком.
+            layout={!prefersReducedMotion}
             className="flex flex-col"
-            initial={prefersReducedMotion || dnd ? false : { opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut", delay: delayMs / 1000 }}
+            initial={false}
+            animate={
+              completing && !prefersReducedMotion
+                ? { height: 0, opacity: 0 }
+                : { height: "auto", opacity: 1 }
+            }
+            transition={{ duration: 0.22, ease: "easeOut" }}
           >
             <div className="flex items-center gap-2 px-2 py-1.5">
-              {dnd ? (
-                // Индикатор перетаскивания: виден при наведении на строку.
-                <GripVerticalIcon
-                  aria-hidden
-                  className="size-4 shrink-0 cursor-grab text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
-                />
-              ) : null}
               <Checkbox
                 size="lg"
-                checked={task.completedAt !== null}
+                checked={done}
                 onCheckedChange={() => void toggleComplete()}
                 onClick={(event) => event.stopPropagation()}
                 aria-label={task.completedAt ? "Вернуть в работу" : "Завершить"}
@@ -471,8 +498,8 @@ export function TaskRow({
                     // Ширина по тексту: клик мимо названия падает на строку и
                     // открывает панель деталей, а не режим правки.
                     // text-sm + leading-6 = метрики инлайн-редактора (без сдвига).
-                    "min-w-0 cursor-pointer truncate text-left text-sm leading-6",
-                    task.completedAt !== null && "line-through decoration-muted-foreground",
+                    "min-w-0 cursor-text truncate text-left text-sm leading-6",
+                    done && "line-through decoration-muted-foreground",
                   )}
                   type="button"
                   title="Нажмите, чтобы переименовать"
@@ -496,12 +523,14 @@ export function TaskRow({
                   aria-label={rruleValueLabel(task.rrule)}
                 />
               ) : null}
-              <TaskDateChip
-                task={task}
-                overdue={overdue}
-                label={dueLabel}
-                onPatch={(input) => void patchTask(input)}
-              />
+              {hideDateChip ? null : (
+                <TaskDateChip
+                  task={task}
+                  overdue={overdue}
+                  label={dueLabel}
+                  onPatch={(input) => void patchTask(input)}
+                />
+              )}
               {/* Счётчик-переключатель блока подзадач; пустой блок не показываем —
                   подзадачи добавляются Shift+Enter в правке названия. */}
               {task.subtasks.length > 0 ? (

@@ -19,9 +19,11 @@ import { useSidebarQuery } from "@/entities/list";
 import { useTagsQuery } from "@/entities/tag";
 import { useSessionStore } from "@/entities/user";
 import { logout } from "@/features/auth";
+import { useUpdateTask } from "@/features/task-manage";
 import { useUpdateList } from "@/features/structure-manage";
 import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
+import { TASK_DRAG_MIME } from "@/shared/lib/task-drag-mime";
 import { Checkbox, Popover } from "@/shared/ui";
 import { CreateEntityDialog, type CreateEntityKind } from "./create-entity-dialog";
 import { FolderGroup } from "./folder-group";
@@ -278,6 +280,10 @@ export function Sidebar() {
   const [dragListId, setDragListId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget>(null);
 
+  // Дроп перетащенной задачи на строку списка — перенос задачи в этот список.
+  const updateTask = useUpdateTask();
+  const [taskOverListId, setTaskOverListId] = useState<string | null>(null);
+
   const sidebar = sidebarQuery.data;
   const tags = tagsQuery.data ?? [];
   const rootLists = sidebar?.rootLists ?? [];
@@ -436,6 +442,28 @@ export function Sidebar() {
     },
   });
 
+  /** Приём дропа задачи на строку списка (включая Inbox). */
+  const taskDropFor = (list: ListDto) => ({
+    over: taskOverListId === list.id,
+    onDragOver: (event: React.DragEvent) => {
+      if (!event.dataTransfer.types.includes(TASK_DRAG_MIME)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      setTaskOverListId(list.id);
+    },
+    onDragLeave: () => setTaskOverListId((current) => (current === list.id ? null : current)),
+    onDrop: (event: React.DragEvent) => {
+      event.preventDefault();
+      const taskId = event.dataTransfer.getData(TASK_DRAG_MIME);
+      setTaskOverListId(null);
+      if (!taskId) return;
+      // Сервер ставит задачу в конец целевого списка (position не задан).
+      updateTask
+        .mutateAsync({ taskId, listId: list.id, sectionId: null })
+        .catch((cause) => setError(errorMessage(cause)));
+    },
+  });
+
   const rootDnd = {
     over: dropTarget?.type === "root" && dragListId !== null,
     onDragOver: (event: React.DragEvent) => {
@@ -470,7 +498,11 @@ export function Sidebar() {
               label="Умные списки"
               action={<SmartVisibilityButton hidden={hiddenSmart} onToggle={toggleSmart} />}
             />
-            <ListRow list={sidebar.inbox} onError={setError} />
+            <ListRow
+              list={sidebar.inbox}
+              onError={setError}
+              taskDrop={taskDropFor(sidebar.inbox)}
+            />
             {SMART_LINKS.filter((link) => !hiddenSmart.has(link.key)).map((link) => (
               <NavLink
                 className={({ isActive }) =>
@@ -515,7 +547,12 @@ export function Sidebar() {
                 layoutId={layoutEnabled ? list.id : undefined}
                 transition={{ duration: 0.18, ease: "easeOut" }}
               >
-                <ListRow list={list} onError={setError} dnd={listDnd(list)} />
+                <ListRow
+                  list={list}
+                  onError={setError}
+                  dnd={listDnd(list)}
+                  taskDrop={taskDropFor(list)}
+                />
               </motion.div>
             ))}
             {sidebar?.folders.map((folder) => (
@@ -524,6 +561,7 @@ export function Sidebar() {
                 folder={folder}
                 onError={setError}
                 dndFor={listDnd}
+                taskDropFor={taskDropFor}
                 folderDnd={folderDnd(folder.id)}
               />
             ))}

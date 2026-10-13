@@ -197,6 +197,13 @@ export const patchSubtaskSchema = z
 
 export type PatchSubtaskDto = z.infer<typeof patchSubtaskSchema>;
 
+/** Задача становится подзадачей этой задачи (POST /v1/tasks/:id/nest). */
+export const nestTaskSchema = z.object({
+  parentTaskId: z.uuid(),
+});
+
+export type NestTaskDto = z.infer<typeof nestTaskSchema>;
+
 // --- Quick-add ---
 
 /** Результат POST /v1/tasks/parse (ничего не создаёт). */

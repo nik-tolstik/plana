@@ -74,7 +74,6 @@ function CompletionSoundSettings() {
             </label>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground">Нажмите на мелодию, чтобы прослушать</p>
       </div>
     </div>
   );

@@ -10,6 +10,8 @@ import { TaskRow } from "./task-row";
 interface TaskGroupBlockProps {
   group: TaskGroup;
   today: string;
+  /** Страница задаёт дату («Сегодня»/«Завтра») — чип даты в строках скрыт. */
+  hideDateChip?: boolean;
   onOpenDetails: (taskId: string) => void;
   dnd?: TaskDragProps;
   editing?: TaskEditingState | null;
@@ -20,6 +22,7 @@ interface TaskGroupBlockProps {
 export function TaskGroupBlock({
   group,
   today,
+  hideDateChip = false,
   onOpenDetails,
   dnd,
   editing,
@@ -59,14 +62,14 @@ export function TaskGroupBlock({
               transition={{ duration: 0.2, ease: "easeOut" }}
               className="overflow-hidden"
             >
-              {group.tasks.map((task, index) => (
+              {group.tasks.map((task) => (
                 <TaskRow
                   key={task.id}
                   task={task}
                   today={today}
+                  hideDateChip={hideDateChip}
                   onOpenDetails={onOpenDetails}
                   dnd={dnd}
-                  delayMs={staggerDelayMs(index)}
                   editing={editing}
                   onEditingChange={onEditingChange}
                 />

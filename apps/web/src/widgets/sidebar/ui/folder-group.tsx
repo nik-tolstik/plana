@@ -8,7 +8,7 @@ import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
 import { ConfirmDeleteDialog, Input } from "@/shared/ui";
 import { CreateEntityDialog } from "./create-entity-dialog";
-import { ListRow, type ListRowDndProps } from "./list-row";
+import { ListRow, type ListRowDndProps, type ListRowTaskDropProps } from "./list-row";
 
 type FolderWithLists = FolderDto & { lists: ListDto[] };
 
@@ -25,11 +25,13 @@ interface FolderGroupProps {
   onError: (message: string) => void;
   /** DnD-пропсы для строк-списков (общие с корневыми списками). */
   dndFor: (list: ListDto) => ListRowDndProps;
+  /** Приём перетащенных задач (общие с корневыми списками). */
+  taskDropFor: (list: ListDto) => ListRowTaskDropProps;
   folderDnd: FolderDndProps;
 }
 
 /** Раскрывающаяся папка: шапка — цель переноса, внутри — сортируемые списки. */
-export function FolderGroup({ folder, onError, dndFor, folderDnd }: FolderGroupProps) {
+export function FolderGroup({ folder, onError, dndFor, taskDropFor, folderDnd }: FolderGroupProps) {
   const [open, setOpen] = useState(true);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -152,7 +154,13 @@ export function FolderGroup({ folder, onError, dndFor, folderDnd }: FolderGroupP
                   layoutId={prefersReducedMotion ? undefined : list.id}
                   transition={{ duration: 0.18, ease: "easeOut" }}
                 >
-                  <ListRow key={list.id} list={list} onError={onError} dnd={dndFor(list)} />
+                  <ListRow
+                    key={list.id}
+                    list={list}
+                    onError={onError}
+                    dnd={dndFor(list)}
+                    taskDrop={taskDropFor(list)}
+                  />
                 </motion.div>
               ))}
             </div>

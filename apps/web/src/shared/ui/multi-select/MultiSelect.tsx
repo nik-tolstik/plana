@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { CheckIcon, ChevronDownIcon, PlusIcon } from "lucide-react";
 
 import { cn } from "@/shared/lib/cn";
-import { Checkbox, Input, Popover } from "@/shared/ui";
+import { Input, Popover } from "@/shared/ui";
 
 export interface MultiSelectOption {
   value: string;
@@ -26,8 +26,8 @@ interface MultiSelectProps {
 
 /**
  * Мультиселект на Popover: триггер с чипами выбранных, в дропдауне —
- * поиск по списку, чекбоксы и создание нового значения. На Select не
- * похож только снаружи; внутри те же токены (control/option).
+ * поиск по списку, выбранные помечаются галочкой справа и созданием нового
+ * значения. На Select не похож только снаружи; внутри те же токены (control/option).
  */
 export function MultiSelect({
   options,
@@ -128,7 +128,6 @@ export function MultiSelect({
                 )}
                 onClick={() => onToggle(option.value)}
               >
-                <Checkbox size="sm" checked={option.selected} tabIndex={-1} aria-hidden />
                 {option.leading}
                 <span className="min-w-0 flex-1 truncate">{option.label}</span>
                 {option.selected ? (

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Trash2Icon } from "lucide-react";
-import { NavLink } from "react-router";
+import { NavLink, useLocation } from "react-router";
 import type { PatchTagDto, TagDto } from "@plana/shared";
 import { useDeleteTag, useUpdateTag } from "@/features/tag-manage";
 import { errorMessage } from "@/shared/lib/error-message";
+import { cn } from "@/shared/lib/cn";
 import { ConfirmDeleteDialog, EntityMarker, EntityStylePopover } from "@/shared/ui";
 
 interface TagRowProps {
@@ -13,6 +14,7 @@ interface TagRowProps {
 
 /** Строка тега в сайдбаре: переход, настройки (имя/цвет/иконка), удаление. */
 export function TagRow({ tag, onError }: TagRowProps) {
+  const { pathname } = useLocation();
   const [confirming, setConfirming] = useState(false);
   const updateTag = useUpdateTag();
   const deleteTag = useDeleteTag();
@@ -25,17 +27,25 @@ export function TagRow({ tag, onError }: TagRowProps) {
     }
   }
 
+  const active = pathname === `/tag/${tag.id}`;
+
   return (
-    <div className="group relative flex min-h-8 items-center rounded-md pr-1 transition-colors hover:bg-surface-hover">
+    // Фон (hover/активный) — на весь контейнер, NavLink прозрачный: подсветка
+    // занимает всю ширину сайдбара, а не только область ссылки.
+    <div
+      className={cn(
+        "group relative flex min-h-8 items-center rounded-md pr-1 transition-colors hover:bg-surface-hover",
+        active && "bg-surface-selected",
+      )}
+    >
       <NavLink
-        className={({ isActive }) =>
-          `flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left ${isActive ? "bg-surface-selected" : ""}`
-        }
+        className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left"
         to={`/tag/${tag.id}`}
       >
         <EntityMarker icon={tag.icon} color={tag.color} />
         <span className="truncate">{tag.name}</span>
       </NavLink>
+      {/* Иконки появляются без собственной подложки — только цвет. */}
       <span className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
         <EntityStylePopover
           title={`Настройки тега «${tag.name}»`}
@@ -43,7 +53,7 @@ export function TagRow({ tag, onError }: TagRowProps) {
           onChange={(patch) => void applyStyle(patch)}
         />
         <button
-          className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+          className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground"
           type="button"
           title="Удалить"
           onClick={() => setConfirming(true)}

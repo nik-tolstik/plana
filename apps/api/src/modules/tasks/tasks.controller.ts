@@ -15,6 +15,7 @@ import type {
   BatchResultDto,
   BatchTasksDto,
   CreateTaskDto,
+  NestTaskDto,
   ParsedQuickAddDto,
   ParseQuickAddRequestDto,
   PatchTaskDto,
@@ -25,6 +26,7 @@ import type {
 import {
   batchTasksSchema,
   createTaskSchema,
+  nestTaskSchema,
   parseQuickAddRequestSchema,
   patchTaskSchema,
   tasksQuerySchema,
@@ -108,6 +110,17 @@ export class TasksController {
     @Param("id", ParseUUIDPipe) taskId: string,
   ): Promise<TaskDto> {
     return this.tasksService.restore(userId, taskId);
+  }
+
+  /** Задача становится подзадачей другой задачи (перетаскивание «внутрь»). */
+  @Post("tasks/:id/nest")
+  @HttpCode(200)
+  nest(
+    @CurrentUserId() userId: string,
+    @Param("id", ParseUUIDPipe) taskId: string,
+    @Body(new ZodValidationPipe(nestTaskSchema)) dto: NestTaskDto,
+  ): Promise<TaskDto> {
+    return this.tasksService.nestTask(userId, taskId, dto.parentTaskId);
   }
 
   @Post("tasks/:id/complete")

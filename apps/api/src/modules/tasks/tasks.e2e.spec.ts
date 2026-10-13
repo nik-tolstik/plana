@@ -218,6 +218,54 @@ describe("задачи: CRUD, подзадачи, умные списки, quick
     expect(afterDelete.subtasks).toHaveLength(1);
   });
 
+  it("nest/promote — задача становится подзадачей и обратно отдельной задачей", async () => {
+    const list = (
+      await http().post("/v1/lists").set(auth()).send({ name: "Конвертация" }).expect(201)
+    ).body;
+    const parent = await createTask({ title: "Родитель", listId: list.id });
+    const child = await createTask({ title: "Станет подзадачей", listId: list.id });
+    const childSub = await createSubtask(child.id, "Вложенная");
+
+    // Задача → подзадача: title и подзадачи переезжают, исходная удаляется.
+    const nested = taskSchema.parse(
+      (
+        await http()
+          .post(`/v1/tasks/${child.id}/nest`)
+          .set(auth())
+          .send({ parentTaskId: parent.id })
+          .expect(200)
+      ).body,
+    );
+    expect(nested.id).toBe(parent.id);
+    expect(nested.subtasks.map((s) => s.title)).toEqual(["Станет подзадачей", "Вложенная"]);
+    await http().get(`/v1/tasks/${child.id}`).set(auth()).expect(404);
+    // Сама себя — 400, из другого списка — 400.
+    await http()
+      .post(`/v1/tasks/${parent.id}/nest`)
+      .set(auth())
+      .send({ parentTaskId: parent.id })
+      .expect(400);
+    const other = await createTask({ title: "Из другого списка" });
+    await http()
+      .post(`/v1/tasks/${other.id}/nest`)
+      .set(auth())
+      .send({ parentTaskId: parent.id })
+      .expect(400);
+
+    // Подзадача → задача сразу после родителя.
+    const promoted = taskSchema.parse(
+      (await http().post(`/v1/subtasks/${nested.subtasks[0]?.id}/promote`).set(auth()).expect(200))
+        .body,
+    );
+    expect(promoted.title).toBe("Станет подзадачей");
+    expect(promoted.listId).toBe(list.id);
+    expect(promoted.position).toBeGreaterThan(parent.position);
+    const afterPromote = taskSchema.parse(
+      (await http().get(`/v1/tasks/${parent.id}`).set(auth()).expect(200)).body,
+    );
+    expect(afterPromote.subtasks.map((s) => s.title)).toEqual(["Вложенная"]);
+  });
+
   it("GET /v1/tasks?smart — today/tomorrow/next7/all/completed/trash", async () => {
     await createTask({ title: "Просроченная", dueDate: yesterday });
     await createTask({ title: "На сегодня", dueDate: today });
@@ -279,17 +327,17 @@ describe("задачи: CRUD, подзадачи, умные списки, quick
     const a = await createTask({ title: "A", listId: list.id });
     const b = await createTask({ title: "B", listId: list.id });
 
-    // Между A и B; после A — позиция строго между соседями.
+    // Новые задачи встают в начало списка: [B, A]. Вставка после A — в хвост.
     const inserted = await createTask({ title: "A1", listId: list.id, afterTaskId: a.id });
     const items = await listTasks(`?listId=${list.id}`);
-    expect(items.map((t) => t.title)).toEqual(["A", "A1", "B"]);
+    expect(items.map((t) => t.title)).toEqual(["B", "A", "A1"]);
     expect(inserted.position).toBeGreaterThan(a.position);
-    expect(inserted.position).toBeLessThan(b.position);
 
-    // Якорь из другого контейнера игнорируется — задача уходит в конец.
+    // Якорь из другого контейнера игнорируется — задача остаётся в своём
+    // списке (входящие) в начале.
     const foreign = await createTask({ title: "Из другого списка", afterTaskId: a.id });
     expect(foreign.listId).toBe(inbox.id);
-    // Чужой якорь — тоже конец, без раскрытия существования.
+    // Чужой якорь — тоже игнор, без раскрытия существования.
     const strangerTask = (
       await http()
         .post("/v1/tasks")
@@ -298,7 +346,7 @@ describe("задачи: CRUD, подзадачи, умные списки, quick
         .expect(201)
     ).body;
     const ignored = await createTask({ title: "Игнор", afterTaskId: strangerTask.id });
-    expect(ignored.position).toBeGreaterThanOrEqual(0);
+    expect(ignored.position).toBeLessThan(0);
   });
 
   it("PATCH /v1/tasks/:id — переименование, позиция с перенумерацией, перемещение", async () => {
@@ -308,12 +356,12 @@ describe("задачи: CRUD, подзадачи, умные списки, quick
     const b = await createTask({ title: "Вторая", listId: order.id });
     const c = await createTask({ title: "Третья", listId: order.id });
 
-    // «Третья» на индекс 0: позиции [0, 1024, 2048].
-    await http().patch(`/v1/tasks/${c.id}`).set(auth()).send({ position: 0 }).expect(200);
+    // Создание в начало: [Третья, Вторая, Первая]. «Первая» на индекс 0.
+    await http().patch(`/v1/tasks/${a.id}`).set(auth()).send({ position: 0 }).expect(200);
     const items = await listTasks(`?listId=${order.id}`);
     const positions = new Map(items.map((t) => [t.title, t.position]));
-    expect(positions.get("Третья")).toBe(0);
-    expect(positions.get("Первая")).toBe(1024);
+    expect(positions.get("Первая")).toBe(0);
+    expect(positions.get("Третья")).toBe(1024);
     expect(positions.get("Вторая")).toBe(2048);
 
     const renamed = taskSchema.parse(

@@ -43,8 +43,23 @@ interface QuickPreset {
 const QUICK_PRESETS: QuickPreset[] = [
   { label: "Сегодня", dayOffset: 0 },
   { label: "Завтра", dayOffset: 1 },
-  { label: "Следующая неделя", dayOffset: 7 },
+  { label: "Неделя", dayOffset: 7 },
+  { label: "Без даты", dayOffset: null },
 ];
+
+/** Выбран ли пресет сейчас (дата совпадает с его днём). */
+function presetActive(preset: QuickPreset, date?: Date): boolean {
+  if (preset.dayOffset === null) {
+    return date === undefined;
+  }
+  if (date === undefined) return false;
+  const target = addDays(new Date(), preset.dayOffset);
+  return (
+    date.getFullYear() === target.getFullYear() &&
+    date.getMonth() === target.getMonth() &&
+    date.getDate() === target.getDate()
+  );
+}
 
 /**
  * finnn → Plana (упрощён): дата — календарь в поповере с быстрыми пресетами,
@@ -142,31 +157,31 @@ export function DateTimePicker({
     }
   };
 
-  /** Общая «начинка»: пресеты + календарь; время — рядом (в inline внутри). */
+  /** Общая «начинка»: пресеты одной строкой + календарь; время — рядом (в inline внутри). */
   const calendarBody = (
     <>
-      <div className="flex flex-wrap gap-1 border-b border-border p-2">
-        {QUICK_PRESETS.map((preset) => (
-          <button
-            key={preset.label}
-            type="button"
-            className="cursor-pointer rounded-md bg-surface-subtle px-2 py-1 text-xs text-secondary-foreground transition-colors hover:bg-surface-hover"
-            onClick={() => handlePresetSelect(preset)}
-          >
-            {preset.label}
-          </button>
-        ))}
-        {clearable ? (
-          <button
-            type="button"
-            className="cursor-pointer rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
-            onClick={() => handlePresetSelect({ label: "", dayOffset: null })}
-          >
-            Без даты
-          </button>
-        ) : null}
+      <div className="flex gap-1 p-2 pb-0">
+        {QUICK_PRESETS.filter((preset) => clearable || preset.dayOffset !== null).map((preset) => {
+          const active = presetActive(preset, date);
+          return (
+            <button
+              key={preset.label}
+              type="button"
+              aria-pressed={active}
+              className={cn(
+                "min-w-0 flex-1 cursor-pointer truncate rounded-md px-2 py-1.5 text-xs transition-colors",
+                active
+                  ? "bg-primary/10 font-medium text-primary-text"
+                  : "text-secondary-foreground hover:bg-surface-hover",
+              )}
+              onClick={() => handlePresetSelect(preset)}
+            >
+              {preset.label}
+            </button>
+          );
+        })}
       </div>
-      <div className="p-2">
+      <div className="p-2 pb-1">
         <Calendar
           mode="single"
           selected={date}

@@ -8,12 +8,20 @@ import { TaskGroupBlock } from "./task-group";
 interface TaskListViewProps {
   groups: TaskGroup[];
   today: string;
+  /** Страница задаёт дату («Сегодня»/«Завтра») — чип даты в строках скрыт. */
+  hideDateChip?: boolean;
   onOpenDetails: (taskId: string) => void;
   dnd?: TaskDragProps;
 }
 
 /** Отображение задач группами; пустое состояние остаётся на странице. */
-export function TaskListView({ groups, today, onOpenDetails, dnd }: TaskListViewProps) {
+export function TaskListView({
+  groups,
+  today,
+  hideDateChip = false,
+  onOpenDetails,
+  dnd,
+}: TaskListViewProps) {
   // Инлайн-ввод один на весь список: одновременно правится одна строка.
   const [editing, setEditing] = useState<TaskEditingState | null>(null);
 
@@ -27,6 +35,7 @@ export function TaskListView({ groups, today, onOpenDetails, dnd }: TaskListView
           group={group}
           key={group.key}
           today={today}
+          hideDateChip={hideDateChip}
           onOpenDetails={onOpenDetails}
           dnd={dnd}
           editing={editing}
