@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CheckIcon, TrashIcon } from "lucide-react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
@@ -11,6 +12,8 @@ import {
   CardHeader,
   CardTitle,
   Checkbox,
+  ContextMenu,
+  DateTimePicker,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -62,36 +65,44 @@ export const Кнопки: StoryObj = {
 };
 
 export const ПоляВвода: StoryObj = {
-  render: () => (
-    <div className="flex max-w-sm flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="story-input">Название</Label>
-        <Input id="story-input" placeholder="Задача на завтра" />
+  render: () => {
+    const [listValue, setListValue] = useState("inbox");
+    return (
+      <div className="flex max-w-sm flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="story-input">Название</Label>
+          <Input id="story-input" placeholder="Задача на завтра" />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="story-input-prefix" required>
+            Сумма
+          </Label>
+          <Input id="story-input-prefix" prefix="₽" placeholder="0" />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="story-input-invalid">С ошибкой</Label>
+          <Input id="story-input-invalid" aria-invalid placeholder="некорректно" />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="story-select">Список</Label>
+          <Select
+            id="story-select"
+            options={[
+              { value: "inbox", label: "Inbox" },
+              { value: "work", label: "Работа" },
+              { value: "home", label: "Дом" },
+            ]}
+            value={listValue}
+            onChange={setListValue}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="story-textarea">Заметка</Label>
+          <Textarea id="story-textarea" placeholder="Детали задачи…" />
+        </div>
       </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="story-input-prefix" required>
-          Сумма
-        </Label>
-        <Input id="story-input-prefix" prefix="₽" placeholder="0" />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="story-input-invalid">С ошибкой</Label>
-        <Input id="story-input-invalid" aria-invalid placeholder="некорректно" />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="story-select">Список</Label>
-        <Select id="story-select">
-          <option>Inbox</option>
-          <option>Работа</option>
-          <option>Дом</option>
-        </Select>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="story-textarea">Заметка</Label>
-        <Textarea id="story-textarea" placeholder="Детали задачи…" />
-      </div>
-    </div>
-  ),
+    );
+  },
 };
 
 export const ЧекбоксыИБейджи: StoryObj = {
@@ -155,6 +166,52 @@ export const КарточкаИСкелетон: StoryObj = {
         </CardContent>
       </Card>
     </div>
+  ),
+};
+
+export const ДатаИВремя: StoryObj = {
+  render: () => {
+    const [date, setDate] = useState<Date | undefined>(new Date(2026, 9, 12, 14, 30));
+    return (
+      <div className="flex max-w-sm flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Label>Дата и время (clearable)</Label>
+          <DateTimePicker date={date} onSelect={setDate} placeholder="Без даты" clearable />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>Только время</Label>
+          <DateTimePicker date={date} onSelect={setDate} showDate={false} />
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Выбрано: {date ? date.toLocaleString("ru-RU") : "ничего"}
+        </p>
+      </div>
+    );
+  },
+};
+
+export const КонтекстноеМеню: StoryObj = {
+  render: () => (
+    <ContextMenu
+      items={[
+        { label: "Завершить", icon: <CheckIcon className="size-4" />, onSelect: () => undefined },
+        {
+          label: "Удалить",
+          icon: <TrashIcon className="size-4" />,
+          danger: true,
+          onSelect: () => undefined,
+        },
+      ]}
+    >
+      {(menuProps) => (
+        <div
+          {...menuProps}
+          className="max-w-sm cursor-default rounded-lg border border-border bg-card p-4 text-sm"
+        >
+          Задача на завтра — нажмите правой кнопкой мыши, чтобы открыть меню
+        </div>
+      )}
+    </ContextMenu>
   ),
 };
 

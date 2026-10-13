@@ -133,6 +133,28 @@ describe("теги, поиск, batch-операции, корзина 30 дне
     expect(cleared.tags).toEqual([]);
   });
 
+  it("POST /v1/tags: создание с цветом/иконкой, 409 при клэше, 400 на пустое имя", async () => {
+    const created = tagSchema.parse(
+      (
+        await http()
+          .post("/v1/tags")
+          .set(auth())
+          .send({ name: "Проект-тег", color: "blue", icon: "briefcase" })
+          .expect(201)
+      ).body,
+    );
+    expect(created.name).toBe("Проект-тег");
+    expect(created.color).toBe("blue");
+    expect(created.icon).toBe("briefcase");
+
+    // Дубликат по lower(name) — конфликт.
+    await http().post("/v1/tags").set(auth()).send({ name: "проект-тег" }).expect(409);
+    // Пустое имя — 400.
+    await http().post("/v1/tags").set(auth()).send({ name: "   " }).expect(400);
+
+    await http().delete(`/v1/tags/${created.id}`).set(auth()).expect(204);
+  });
+
   it("GET/PATCH/DELETE /v1/tags: переименование, 409 при клэше, порядок, удаление", async () => {
     const urgent = (await listTags()).find((tag) => tag.name === "Срочно")!;
     const renamed = tagSchema.parse(
@@ -141,9 +163,40 @@ describe("теги, поиск, batch-операции, корзина 30 дне
     );
     expect(renamed.name).toBe("Важное");
 
-    // Имя (по lower) уже занято тегом «Работа».
+    // Смена регистра собственного имени («Работа» → «РАБОТА») — не клэш с собой.
     const workTag = (await listTags()).find((tag) => tag.name === "Работа")!;
-    await http().patch(`/v1/tags/${workTag.id}`).set(auth()).send({ name: "РАБОТА" }).expect(409);
+    const recased = tagSchema.parse(
+      (
+        await http()
+          .patch(`/v1/tags/${workTag.id}`)
+          .set(auth())
+          .send({ name: "РАБОТА" })
+          .expect(200)
+      ).body,
+    );
+    expect(recased.name).toBe("РАБОТА");
+
+    // Имя (по lower) уже занято ДРУГИМ тегом.
+    await http().patch(`/v1/tags/${urgent.id}`).set(auth()).send({ name: "работа" }).expect(409);
+
+    // Цвет и иконка тега.
+    const styled = tagSchema.parse(
+      (
+        await http()
+          .patch(`/v1/tags/${workTag.id}`)
+          .set(auth())
+          .send({ color: "blue", icon: "briefcase" })
+          .expect(200)
+      ).body,
+    );
+    expect(styled.color).toBe("blue");
+    expect(styled.icon).toBe("briefcase");
+    await http().patch(`/v1/tags/${workTag.id}`).set(auth()).send({ color: "magenta" }).expect(400);
+    await http()
+      .patch(`/v1/tags/${workTag.id}`)
+      .set(auth())
+      .send({ icon: "not-an-icon" })
+      .expect(400);
 
     // position = целевой индекс: «Работа» на индекс 0.
     const moved = tagSchema.parse(
@@ -151,7 +204,7 @@ describe("теги, поиск, batch-операции, корзина 30 дне
         .body,
     );
     expect(moved.position).toBe(0);
-    expect((await listTags()).map((tag) => tag.name)).toEqual(["Работа", "Важное", "Дом"]);
+    expect((await listTags()).map((tag) => tag.name)).toEqual(["РАБОТА", "Важное", "Дом"]);
 
     // Удаление тега снимает его с задач (FK cascade).
     const tagged = await createTask({ title: "С тегом", tagNames: ["Работа"] });

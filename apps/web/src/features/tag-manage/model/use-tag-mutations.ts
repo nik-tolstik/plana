@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiDeleteTag, apiUpdateTag, tagKeys } from "@/entities/tag";
+import { apiCreateTag, apiDeleteTag, apiUpdateTag, tagKeys } from "@/entities/tag";
 import { taskKeys } from "@/entities/task";
 
 function useInvalidateTags() {
@@ -10,6 +10,14 @@ function useInvalidateTags() {
       queryClient.invalidateQueries({ queryKey: tagKeys.all }),
       queryClient.invalidateQueries({ queryKey: taskKeys.all }),
     ]);
+}
+
+export function useCreateTag() {
+  const invalidate = useInvalidateTags();
+  return useMutation({
+    mutationFn: apiCreateTag,
+    onSuccess: invalidate,
+  });
 }
 
 export function useUpdateTag() {

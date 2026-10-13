@@ -1,6 +1,6 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type { PatchTagDto, TagDto } from "@plana/shared";
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import type { CreateTagDto, PatchTagDto, TagDto } from "@plana/shared";
+import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
 import { DB } from "../../db/database.module";
 import type { Db } from "../../db/drizzle";
 import { tags } from "../../db/schema";
@@ -12,6 +12,9 @@ export function toTagDto(row: TagRow): TagDto {
   return {
     id: row.id,
     name: row.name,
+    // Колонки text, реестр значений — палитры из @plana/shared.
+    color: row.color as TagDto["color"],
+    icon: (row.icon as TagDto["icon"]) ?? null,
     position: row.position,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -43,15 +46,51 @@ export class TagsService {
     return rows.map(toTagDto);
   }
 
+  /** Создание тега (интерфейс тегов в сайдбаре); имя уникально по lower(name). */
+  async create(userId: string, dto: CreateTagDto): Promise<TagDto> {
+    const [clash] = await this.db
+      .select({ id: tags.id })
+      .from(tags)
+      .where(and(eq(tags.userId, userId), sql`lower(${tags.name}) = lower(${dto.name})`))
+      .limit(1);
+    if (clash) {
+      throw new ConflictException({ description: "Тег с таким именем уже есть" });
+    }
+    const [last] = await this.db
+      .select({ position: tags.position })
+      .from(tags)
+      .where(eq(tags.userId, userId))
+      .orderBy(desc(tags.position))
+      .limit(1);
+    const [row] = await this.db
+      .insert(tags)
+      .values({
+        userId,
+        name: dto.name,
+        color: dto.color ?? "gray",
+        icon: dto.icon ?? null,
+        position: (last?.position ?? 0) + POSITION_STEP,
+      })
+      .returning();
+    return toTagDto(row!);
+  }
+
   async update(userId: string, tagId: string, dto: PatchTagDto): Promise<TagDto> {
     const tag = await this.findOwned(userId, tagId);
 
     if (dto.name !== undefined && dto.name !== tag.name) {
-      // Уникальность имён в рамках пользователя — по lower(name).
+      // Уникальность имён в рамках пользователя — по lower(name). Смена регистра
+      // («дизайн» → «Дизайн») не конфликтует с самим тегом — исключаем его.
       const [clash] = await this.db
         .select({ id: tags.id })
         .from(tags)
-        .where(and(eq(tags.userId, userId), sql`lower(${tags.name}) = lower(${dto.name})`))
+        .where(
+          and(
+            eq(tags.userId, userId),
+            sql`lower(${tags.name}) = lower(${dto.name})`,
+            ne(tags.id, tagId),
+          ),
+        )
         .limit(1);
       if (clash) {
         throw new ConflictException({ description: "Тег с таким именем уже есть" });
@@ -60,6 +99,8 @@ export class TagsService {
 
     const values: Partial<typeof tags.$inferInsert> = { updatedAt: new Date() };
     if (dto.name !== undefined) values.name = dto.name;
+    if (dto.color !== undefined) values.color = dto.color;
+    if (dto.icon !== undefined) values.icon = dto.icon;
 
     if (dto.position === undefined) {
       const [updated] = await this.db

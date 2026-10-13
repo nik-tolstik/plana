@@ -1,4 +1,7 @@
+import { useState } from "react";
+
 import type { TaskGroup } from "../model/grouping";
+import type { TaskEditingState } from "../model/editing";
 import type { TaskDragProps } from "../model/use-drag-reorder";
 import { TaskGroupBlock } from "./task-group";
 
@@ -11,6 +14,9 @@ interface TaskListViewProps {
 
 /** Отображение задач группами; пустое состояние остаётся на странице. */
 export function TaskListView({ groups, today, onOpenDetails, dnd }: TaskListViewProps) {
+  // Инлайн-ввод один на весь список: одновременно правится одна строка.
+  const [editing, setEditing] = useState<TaskEditingState | null>(null);
+
   if (groups.length === 0) {
     return null;
   }
@@ -23,6 +29,8 @@ export function TaskListView({ groups, today, onOpenDetails, dnd }: TaskListView
           today={today}
           onOpenDetails={onOpenDetails}
           dnd={dnd}
+          editing={editing}
+          onEditingChange={setEditing}
         />
       ))}
     </div>

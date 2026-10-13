@@ -30,6 +30,8 @@ export function ThemeSwitch({ onUserUpdated }: { onUserUpdated?: (user: UserDto)
       value={theme}
       onChange={select}
       options={OPTIONS}
+      // По ширине контента: без растяжения на всю колонку страницы.
+      className="self-start"
     />
   );
 }

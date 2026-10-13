@@ -102,6 +102,7 @@ export const lists = pgTable(
     folderId: uuid("folder_id").references(() => folders.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     color: text("color").notNull().default("gray"),
+    icon: text("icon"),
     emoji: text("emoji"),
     kind: listKindEnum("kind").notNull().default("regular"),
     position: integer("position").notNull(),
@@ -189,6 +190,9 @@ export const tags = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    // Реестр значений — палитра LIST_COLORS / ENTITY_ICONS из @plana/shared.
+    color: text("color").notNull().default("gray"),
+    icon: text("icon"),
     position: integer("position").notNull(),
     ...timestamps,
   },

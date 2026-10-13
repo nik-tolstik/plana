@@ -1,33 +1,23 @@
 import { useState } from "react";
 import { XIcon } from "lucide-react";
 import type { TaskDto } from "@plana/shared";
-import { useCreateSubtask, useDeleteSubtask, useUpdateSubtask } from "@/features/task-manage";
+import { useDeleteSubtask, useUpdateSubtask } from "@/features/task-manage";
 import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
-import { Checkbox, Input } from "@/shared/ui";
+import { Checkbox } from "@/shared/ui";
 
 interface SubtasksBlockProps {
   task: TaskDto;
 }
 
-/** Чеклист подзадач: отметить, добавить, удалить. */
+/**
+ * Чеклист подзадач: отметить, удалить. Новые подзадачи добавляются
+ * Shift+Enter в инлайн-режиме названия задачи (см. TaskRow).
+ */
 export function SubtasksBlock({ task }: SubtasksBlockProps) {
-  const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const createSubtask = useCreateSubtask();
   const updateSubtask = useUpdateSubtask();
   const deleteSubtask = useDeleteSubtask();
-
-  async function add() {
-    const trimmed = title.trim();
-    if (trimmed.length === 0) return;
-    try {
-      await createSubtask.mutateAsync({ taskId: task.id, title: trimmed });
-      setTitle("");
-    } catch (cause) {
-      setError(errorMessage(cause));
-    }
-  }
 
   async function toggle(subtaskId: string, done: boolean) {
     try {
@@ -78,18 +68,6 @@ export function SubtasksBlock({ task }: SubtasksBlockProps) {
           </li>
         ))}
       </ul>
-      <Input
-        className="min-h-8"
-        aria-label="Новая подзадача"
-        placeholder="+ подзадача"
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            void add();
-          }
-        }}
-      />
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>
   );

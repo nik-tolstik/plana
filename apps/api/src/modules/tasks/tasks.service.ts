@@ -27,6 +27,7 @@ import {
   count,
   desc,
   eq,
+  gt,
   gte,
   ilike,
   inArray,
@@ -59,7 +60,7 @@ export type TagRow = typeof tags.$inferSelect;
 export function toTaskDto(
   row: TaskRow,
   taskSubtasks: SubtaskRow[],
-  taskTags: Array<Pick<TagRow, "id" | "name">>,
+  taskTags: Array<Pick<TagRow, "id" | "name" | "color" | "icon">>,
 ): TaskDto {
   const dto: TaskDto = {
     id: row.id,
@@ -79,7 +80,12 @@ export function toTaskDto(
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     subtasks: taskSubtasks.map(toSubtaskDto),
-    tags: taskTags.map<TaskTagDto>((tag) => ({ id: tag.id, name: tag.name })),
+    tags: taskTags.map<TaskTagDto>((tag) => ({
+      id: tag.id,
+      name: tag.name,
+      color: tag.color as TaskTagDto["color"],
+      icon: (tag.icon as TaskTagDto["icon"]) ?? null,
+    })),
   };
   return dto;
 }
@@ -188,6 +194,44 @@ export class TasksService {
     return (last?.position ?? -POSITION_STEP) + POSITION_STEP;
   }
 
+  /**
+   * Позиция сразу после задачи-якоря в том же контейнере (список + секция).
+   * Чужой якорь или другой контейнер — игнорируем, задача уходит в конец.
+   */
+  private async positionAfter(
+    userId: string,
+    listId: string,
+    sectionId: string | null,
+    afterTaskId: string,
+  ): Promise<number | null> {
+    const [after] = await this.db
+      .select({ listId: tasks.listId, sectionId: tasks.sectionId, position: tasks.position })
+      .from(tasks)
+      .where(and(eq(tasks.id, afterTaskId), eq(tasks.userId, userId), isNull(tasks.trashedAt)))
+      .limit(1);
+    if (!after || after.listId !== listId || (after.sectionId ?? null) !== sectionId) {
+      return null;
+    }
+    const [next] = await this.db
+      .select({ position: tasks.position })
+      .from(tasks)
+      .where(
+        and(
+          this.containerCondition(listId, sectionId),
+          isNull(tasks.trashedAt),
+          gt(tasks.position, after.position),
+        ),
+      )
+      .orderBy(asc(tasks.position))
+      .limit(1);
+    if (!next) {
+      return after.position + POSITION_STEP;
+    }
+    const middle = Math.ceil((after.position + next.position) / 2);
+    // Соседи стоят вплотную (шаг исчерпан) — конец надёжнее перенумерации.
+    return middle > after.position ? middle : null;
+  }
+
   async create(userId: string, dto: CreateTaskDto): Promise<TaskDto> {
     const listId = dto.listId ?? (await this.findInboxListId(userId));
     await this.assertListOwned(userId, listId);
@@ -195,7 +239,11 @@ export class TasksService {
     if (sectionId !== null) {
       await this.assertSectionInList(userId, sectionId, listId);
     }
-    const position = await this.nextPosition(listId, sectionId);
+    const position =
+      dto.afterTaskId !== undefined
+        ? ((await this.positionAfter(userId, listId, sectionId, dto.afterTaskId)) ??
+          (await this.nextPosition(listId, sectionId)))
+        : await this.nextPosition(listId, sectionId);
     const [created] = await this.db
       .insert(tasks)
       .values({
@@ -235,7 +283,14 @@ export class TasksService {
 
     const base = and(eq(tasks.userId, userId));
     let where = base;
-    let orderBy = [desc(tasks.pinned), asc(tasks.dueDate), asc(tasks.createdAt)];
+    // position — «настоящий» порядок в списках (DnD, afterTaskId); createdAt
+    // только разводит задачи с одинаковыми позициями соседних списков.
+    let orderBy = [
+      desc(tasks.pinned),
+      asc(tasks.dueDate),
+      asc(tasks.position),
+      asc(tasks.createdAt),
+    ];
 
     if (query.listId !== undefined) {
       await this.assertListOwned(userId, query.listId);
@@ -351,16 +406,25 @@ export class TasksService {
 
     const tagRows = ids.length
       ? await this.db
-          .select({ taskId: taskTags.taskId, id: tags.id, name: tags.name })
+          .select({
+            taskId: taskTags.taskId,
+            id: tags.id,
+            name: tags.name,
+            color: tags.color,
+            icon: tags.icon,
+          })
           .from(taskTags)
           .innerJoin(tags, eq(tags.id, taskTags.tagId))
           .where(inArray(taskTags.taskId, ids))
           .orderBy(asc(tags.name))
       : [];
-    const tagsByTask = new Map<string, Array<{ id: string; name: string }>>();
+    const tagsByTask = new Map<
+      string,
+      Array<{ id: string; name: string; color: string; icon: string | null }>
+    >();
     for (const tag of tagRows) {
       const list = tagsByTask.get(tag.taskId) ?? [];
-      list.push({ id: tag.id, name: tag.name });
+      list.push({ id: tag.id, name: tag.name, color: tag.color, icon: tag.icon });
       tagsByTask.set(tag.taskId, list);
     }
 
@@ -480,7 +544,7 @@ export class TasksService {
       .where(eq(subtasks.taskId, row.id))
       .orderBy(asc(subtasks.position));
     const tagRows = await this.db
-      .select({ id: tags.id, name: tags.name })
+      .select({ id: tags.id, name: tags.name, color: tags.color, icon: tags.icon })
       .from(taskTags)
       .innerJoin(tags, eq(tags.id, taskTags.tagId))
       .where(eq(taskTags.taskId, row.id))

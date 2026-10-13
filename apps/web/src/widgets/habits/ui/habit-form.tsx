@@ -13,7 +13,7 @@ import { useCreateHabit } from "@/features/habit-manage";
 import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
 import { Button, Input, Label, Select } from "@/shared/ui";
-import { LIST_DOT_COLORS } from "@/widgets/sidebar/model/colors";
+import { ENTITY_COLORS } from "@/shared/ui";
 
 const COLOR_LABELS_RU: Record<ListColor, string> = {
   gray: "Серый",
@@ -102,15 +102,13 @@ export function HabitForm() {
               <Label htmlFor="habit-type">Тип</Label>
               <Select
                 id="habit-type"
+                options={HABIT_TYPES.map((value) => ({
+                  value,
+                  label: HABIT_TYPE_LABELS_RU[value],
+                }))}
                 value={type}
-                onChange={(event) => setType(event.target.value as HabitType)}
-              >
-                {HABIT_TYPES.map((value) => (
-                  <option key={value} value={value}>
-                    {HABIT_TYPE_LABELS_RU[value]}
-                  </option>
-                ))}
-              </Select>
+                onChange={(next) => setType(next as HabitType)}
+              />
             </div>
             {type === "number" ? (
               <div className="flex flex-col gap-1.5">
@@ -129,19 +127,17 @@ export function HabitForm() {
               <Label htmlFor="habit-color">Цвет</Label>
               <Select
                 id="habit-color"
+                options={HABIT_COLORS.map((value) => ({
+                  value,
+                  label: COLOR_LABELS_RU[value],
+                }))}
                 value={color}
-                onChange={(event) => setColor(event.target.value as ListColor)}
-              >
-                {HABIT_COLORS.map((value) => (
-                  <option key={value} value={value}>
-                    {COLOR_LABELS_RU[value]}
-                  </option>
-                ))}
-              </Select>
+                onChange={(next) => setColor(next as ListColor)}
+              />
               <span
                 aria-hidden="true"
                 className="mt-1 size-3 self-start rounded-full"
-                style={{ background: LIST_DOT_COLORS[color] }}
+                style={{ background: ENTITY_COLORS[color] }}
               />
             </div>
           </div>

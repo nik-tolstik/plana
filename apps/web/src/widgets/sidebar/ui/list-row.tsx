@@ -1,41 +1,41 @@
-import { useState } from "react";
 import { Link, useLocation } from "react-router";
-import { PencilIcon, XIcon } from "lucide-react";
-import type { ListDto } from "@plana/shared";
+import { InboxIcon, XIcon } from "lucide-react";
+import type { ListDto, PatchListDto } from "@plana/shared";
 import { useTrashList, useUpdateList } from "@/features/structure-manage";
 import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
-import { Input } from "@/shared/ui";
-import { LIST_DOT_COLORS } from "../model/colors";
+import { EntityMarker, EntityStylePopover } from "@/shared/ui";
+
+export interface ListRowDndProps {
+  dragging: boolean;
+  over: boolean;
+  onDragStart: (event: React.DragEvent) => void;
+  onDragOver: (event: React.DragEvent) => void;
+  onDragLeave: () => void;
+  onDrop: (event: React.DragEvent) => void;
+  onDragEnd: () => void;
+}
 
 interface ListRowProps {
   list: ListDto;
   onError: (message: string) => void;
+  /** Перетаскивание корневых проектов: дроп на другой проект создаёт папку. */
+  dnd?: ListRowDndProps;
 }
 
-/** Строка списка в сайдбаре: переход, инлайн-переименование, удаление. Inbox — без действий. */
-export function ListRow({ list, onError }: ListRowProps) {
+/** Строка списка в сайдбаре: переход, настройки (имя/цвет/иконка), удаление. */
+export function ListRow({ list, onError, dnd }: ListRowProps) {
   const { pathname } = useLocation();
   const active = pathname === `/list/${list.id}`;
 
   const updateList = useUpdateList();
   const trashList = useTrashList();
 
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(list.name);
-
-  async function saveRename() {
-    const trimmed = name.trim();
-    setEditing(false);
-    if (!trimmed || trimmed === list.name) {
-      setName(list.name);
-      return;
-    }
+  async function applyStyle(input: PatchListDto) {
     try {
-      await updateList.mutateAsync({ listId: list.id, input: { name: trimmed } });
-    } catch (error) {
-      setName(list.name);
-      onError(errorMessage(error));
+      await updateList.mutateAsync({ listId: list.id, input });
+    } catch (cause) {
+      onError(errorMessage(cause));
     }
   }
 
@@ -45,31 +45,9 @@ export function ListRow({ list, onError }: ListRowProps) {
     }
     try {
       await trashList.mutateAsync(list.id);
-    } catch (error) {
-      onError(errorMessage(error));
+    } catch (cause) {
+      onError(errorMessage(cause));
     }
-  }
-
-  if (editing) {
-    return (
-      <Input
-        className="min-h-7"
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        onBlur={saveRename}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            saveRename();
-          }
-          if (event.key === "Escape") {
-            setName(list.name);
-            setEditing(false);
-          }
-        }}
-        autoFocus
-        aria-label="Новое название списка"
-      />
-    );
   }
 
   const editable = list.kind !== "inbox";
@@ -79,33 +57,34 @@ export function ListRow({ list, onError }: ListRowProps) {
       className={cn(
         "group flex min-h-8 items-center rounded-md pr-1 transition-colors hover:bg-surface-hover",
         active && "bg-surface-selected",
+        dnd?.dragging && "opacity-40",
+        dnd?.over && "bg-surface-selected ring-1 ring-primary",
       )}
+      draggable={dnd !== undefined}
+      onDragStart={dnd?.onDragStart}
+      onDragOver={dnd?.onDragOver}
+      onDragLeave={dnd?.onDragLeave}
+      onDrop={dnd?.onDrop}
+      onDragEnd={dnd?.onDragEnd}
     >
       <Link
         className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left"
         to={`/list/${list.id}`}
       >
-        {list.emoji ? (
-          <span aria-hidden>{list.emoji}</span>
+        {list.kind === "inbox" ? (
+          <InboxIcon aria-hidden className="size-4 shrink-0 text-primary-text" />
         ) : (
-          <span
-            className="size-2.5 shrink-0 rounded-full"
-            style={{ background: LIST_DOT_COLORS[list.color] }}
-            aria-hidden
-          />
+          <EntityMarker icon={list.icon} color={list.color} />
         )}
         <span className="truncate">{list.name}</span>
       </Link>
       {editable ? (
-        <span className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
-            className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
-            type="button"
-            title="Переименовать"
-            onClick={() => setEditing(true)}
-          >
-            <PencilIcon className="size-3.5" />
-          </button>
+        <span className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+          <EntityStylePopover
+            title={`Настройки списка «${list.name}»`}
+            style={{ name: list.name, color: list.color, icon: list.icon }}
+            onChange={(patch) => void applyStyle(patch)}
+          />
           <button
             className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
             type="button"

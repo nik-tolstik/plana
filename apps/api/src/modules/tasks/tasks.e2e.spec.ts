@@ -273,6 +273,34 @@ describe("задачи: CRUD, подзадачи, умные списки, quick
     await http().get(`/v1/tasks?listId=${strangerList.id}`).set(auth()).expect(404);
   });
 
+  it("POST /v1/tasks afterTaskId — вставка между задачами того же контейнера", async () => {
+    const list = (await http().post("/v1/lists").set(auth()).send({ name: "Инлайн" }).expect(201))
+      .body;
+    const a = await createTask({ title: "A", listId: list.id });
+    const b = await createTask({ title: "B", listId: list.id });
+
+    // Между A и B; после A — позиция строго между соседями.
+    const inserted = await createTask({ title: "A1", listId: list.id, afterTaskId: a.id });
+    const items = await listTasks(`?listId=${list.id}`);
+    expect(items.map((t) => t.title)).toEqual(["A", "A1", "B"]);
+    expect(inserted.position).toBeGreaterThan(a.position);
+    expect(inserted.position).toBeLessThan(b.position);
+
+    // Якорь из другого контейнера игнорируется — задача уходит в конец.
+    const foreign = await createTask({ title: "Из другого списка", afterTaskId: a.id });
+    expect(foreign.listId).toBe(inbox.id);
+    // Чужой якорь — тоже конец, без раскрытия существования.
+    const strangerTask = (
+      await http()
+        .post("/v1/tasks")
+        .set({ Authorization: `Bearer ${stranger.accessToken}` })
+        .send({ title: "Чужая" })
+        .expect(201)
+    ).body;
+    const ignored = await createTask({ title: "Игнор", afterTaskId: strangerTask.id });
+    expect(ignored.position).toBeGreaterThanOrEqual(0);
+  });
+
   it("PATCH /v1/tasks/:id — переименование, позиция с перенумерацией, перемещение", async () => {
     const order = (await http().post("/v1/lists").set(auth()).send({ name: "Порядок" }).expect(201))
       .body;

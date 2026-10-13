@@ -57,27 +57,21 @@ export function ListPage() {
   return (
     <div className="flex w-full items-start gap-6">
       <PageFade className="min-w-0 flex-1 flex-col gap-3">
-        <header>
-          <h1 className="mb-3 text-xl font-semibold">
+        <header className="mb-3 flex items-center gap-1">
+          <h1 className="min-w-0 truncate text-xl font-semibold">
             {list?.emoji ? `${list.emoji} ` : ""}
             {list?.name ?? "…"}
           </h1>
+          <button
+            type="button"
+            title="Добавить секцию"
+            aria-label="Добавить секцию"
+            onClick={() => setAddingSection(true)}
+            className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+          >
+            <PlusIcon className="size-4" />
+          </button>
         </header>
-
-        <QuickAdd defaultListId={listId} />
-
-        {tasksQuery.isPending ? (
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-2/3" />
-          </div>
-        ) : null}
-        {tasksQuery.isError ? (
-          <p className="text-destructive">Не удалось загрузить задачи</p>
-        ) : null}
-
-        <TaskListView groups={groups} today={today} onOpenDetails={setDetailsTaskId} dnd={dnd} />
 
         <AnimatePresence initial={false}>
           {addingSection ? (
@@ -123,24 +117,23 @@ export function ListPage() {
                 <XIcon className="size-4" />
               </button>
             </motion.form>
-          ) : (
-            <motion.div
-              key="btn-section"
-              initial={false}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <Button
-                variant="ghost"
-                size="sm"
-                className="justify-start text-muted-foreground hover:text-foreground"
-                onClick={() => setAddingSection(true)}
-              >
-                <PlusIcon /> Секция
-              </Button>
-            </motion.div>
-          )}
+          ) : null}
         </AnimatePresence>
+
+        <QuickAdd defaultListId={listId} />
+
+        {tasksQuery.isPending ? (
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-2/3" />
+          </div>
+        ) : null}
+        {tasksQuery.isError ? (
+          <p className="text-destructive">Не удалось загрузить задачи</p>
+        ) : null}
+
+        <TaskListView groups={groups} today={today} onOpenDetails={setDetailsTaskId} dnd={dnd} />
       </PageFade>
 
       <AnimatePresence>

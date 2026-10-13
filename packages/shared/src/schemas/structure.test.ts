@@ -12,6 +12,7 @@ const list: ListDto = {
   folderId: null,
   name: "Inbox",
   color: "gray",
+  icon: null,
   emoji: null,
   kind: "inbox",
   position: 0,

@@ -10,10 +10,12 @@ import { Input } from "@/shared/ui";
 interface QuickAddProps {
   /** Список по умолчанию для новых задач (для страниц списков). */
   defaultListId?: string;
+  /** Дата по умолчанию, если в тексте нет явной даты (страницы «Сегодня»/«Завтра»). */
+  defaultDueDate?: string;
 }
 
 /** Поле быстрого ввода: разбирает даты/время/приоритет на лету (shared parseQuickAdd). */
-export function QuickAdd({ defaultListId }: QuickAddProps) {
+export function QuickAdd({ defaultListId, defaultDueDate }: QuickAddProps) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const timezone = useUserTimezone();
@@ -34,7 +36,8 @@ export function QuickAdd({ defaultListId }: QuickAddProps) {
     try {
       await createTask.mutateAsync({
         title: parsed.title,
-        dueDate: parsed.dueDate ?? undefined,
+        // Явная дата из текста важнее даты страницы.
+        dueDate: parsed.dueDate ?? defaultDueDate,
         dueTime: parsed.dueTime ?? undefined,
         rrule: parsed.rrule ?? undefined,
         priority: parsed.priority === "none" ? undefined : parsed.priority,
@@ -51,10 +54,11 @@ export function QuickAdd({ defaultListId }: QuickAddProps) {
 
   const chips: string[] = [];
   if (parsed?.dueDate) chips.push(parsed.dueDate.split("-").reverse().join("."));
+  else if (defaultDueDate) chips.push(defaultDueDate.split("-").reverse().join("."));
   if (parsed?.dueTime) chips.push(parsed.dueTime);
   if (parsed?.rrule) chips.push(rruleValueLabel(parsed.rrule));
   if (parsed && parsed.priority !== "none") chips.push(TASK_PRIORITY_LABELS_RU[parsed.priority]);
-  if (parsed) chips.push(...parsed.tags.map((tag) => `#${tag}`));
+  if (parsed) chips.push(...parsed.tags);
 
   return (
     <div className="flex flex-col gap-1.5">

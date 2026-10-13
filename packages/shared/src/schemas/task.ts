@@ -142,6 +142,11 @@ export const createTaskSchema = z
     listId: z.uuid().optional(),
     sectionId: z.uuid().nullable().optional(),
     pinned: z.boolean().optional(),
+    /**
+     * Вставить сразу после этой задачи (тот же список и секция). Инлайн-ввод:
+     * Enter в редактировании названия создаёт следующую задачу под текущей.
+     */
+    afterTaskId: z.uuid().optional(),
   })
   .refine((dto) => dto.dueTime == null || dto.dueDate != null, {
     message: "Время имеет смысл только вместе с датой",

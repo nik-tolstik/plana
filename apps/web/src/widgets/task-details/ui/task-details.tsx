@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { XIcon } from "lucide-react";
 import {
@@ -7,18 +7,25 @@ import {
   rruleValueLabel,
   todayInZone,
   type TaskDto,
+  type TaskPriority,
 } from "@plana/shared";
 import { useSectionsQuery, useSidebarQuery } from "@/entities/list";
 import { useTagsQuery } from "@/entities/tag";
 import { useUserTimezone } from "@/entities/task";
-import {
-  useCompleteTask,
-  useTrashTask,
-  useUncompleteTask,
-  useUpdateTask,
-} from "@/features/task-manage";
+import { useCompleteTask, useUncompleteTask, useUpdateTask } from "@/features/task-manage";
 import { errorMessage } from "@/shared/lib/error-message";
-import { Button, Checkbox, Input, Label, Select, Textarea } from "@/shared/ui";
+import {
+  Button,
+  Checkbox,
+  ColorDot,
+  DateTimePicker,
+  EntityMarker,
+  Input,
+  Label,
+  MultiSelect,
+  Select,
+  Textarea,
+} from "@/shared/ui";
 
 interface TaskDetailsProps {
   task: TaskDto;
@@ -36,32 +43,93 @@ const REPEAT_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "FREQ=YEARLY", label: "Каждый год" },
 ];
 
-/** Правая панель редактирования задачи (desktop; на мобильном — поверх списка). */
+/** Задержка автосохранения после последнего изменения, мс. */
+const AUTOSAVE_DELAY_MS = 600;
+
+interface DetailsFormState {
+  title: string;
+  description: string;
+  dueDate: string;
+  dueTime: string;
+  priority: TaskPriority;
+  pinned: boolean;
+  listId: string;
+  sectionId: string;
+  rrule: string;
+  tagNames: string[];
+}
+
+function formFromTask(task: TaskDto): DetailsFormState {
+  return {
+    title: task.title,
+    description: task.description,
+    dueDate: task.dueDate ?? "",
+    dueTime: task.dueTime?.slice(0, 5) ?? "",
+    priority: task.priority,
+    pinned: task.pinned,
+    listId: task.listId,
+    sectionId: task.sectionId ?? "",
+    rrule: task.rrule ?? "",
+    tagNames: task.tags.map((tag) => tag.name),
+  };
+}
+
+/** Diff формы с задачей → PATCH-полезная нагрузка; null = изменений нет. */
+function buildPatch(
+  task: TaskDto,
+  form: DetailsFormState,
+  timezone: string,
+): Record<string, unknown> | null {
+  const patch: Record<string, unknown> = {};
+  const title = form.title.trim();
+  // Пустое название не уходит на сервер — поле останется правиться.
+  if (title.length > 0 && title !== task.title) patch.title = title;
+  if (form.description !== task.description) patch.description = form.description;
+  // Повтор требует даты: без явной даты отсчёт с сегодняшнего дня.
+  const effectiveDueDate =
+    form.dueDate === "" && form.rrule !== "" ? todayInZone(new Date(), timezone) : form.dueDate;
+  if (effectiveDueDate !== (task.dueDate ?? "")) {
+    patch.dueDate = effectiveDueDate === "" ? null : effectiveDueDate;
+  }
+  const effectiveDueTime = effectiveDueDate === "" ? "" : form.dueTime;
+  if (effectiveDueTime !== (task.dueTime?.slice(0, 5) ?? "")) {
+    patch.dueTime = effectiveDueTime === "" ? null : effectiveDueTime;
+  }
+  if (form.priority !== task.priority) patch.priority = form.priority;
+  if (form.pinned !== task.pinned) patch.pinned = form.pinned;
+  if (form.listId !== task.listId) {
+    // Перенос в другой список сбрасывает секцию (секции принадлежат списку).
+    patch.listId = form.listId;
+    patch.sectionId = form.sectionId === "" ? null : form.sectionId;
+  } else if (form.sectionId !== (task.sectionId ?? "")) {
+    patch.sectionId = form.sectionId === "" ? null : form.sectionId;
+  }
+  if (form.rrule !== (task.rrule ?? "")) patch.rrule = form.rrule === "" ? null : form.rrule;
+  const tagsChanged =
+    [...form.tagNames].sort().join("\n") !==
+    task.tags
+      .map((tag) => tag.name)
+      .sort()
+      .join("\n");
+  if (tagsChanged && form.tagNames.length <= 20) patch.tagNames = form.tagNames;
+  return Object.keys(patch).length > 0 ? patch : null;
+}
+
+/**
+ * Правая панель задачи: fixed поверх контента (не сжимает страницу),
+ * изменения сохраняются автоматически, без кнопки «Сохранить».
+ */
 export function TaskDetails({ task, onClose }: TaskDetailsProps) {
   const sidebarQuery = useSidebarQuery();
   const tagsQuery = useTagsQuery();
   const update = useUpdateTask();
   const complete = useCompleteTask();
   const uncomplete = useUncompleteTask();
-  const trash = useTrashTask();
   const timezone = useUserTimezone();
   const prefersReducedMotion = useReducedMotion();
 
-  const [title, setTitle] = useState(task.title);
-  const [description, setDescription] = useState(task.description);
-  const [dueDate, setDueDate] = useState(task.dueDate ?? "");
-  const [dueTime, setDueTime] = useState(task.dueTime?.slice(0, 5) ?? "");
-  const [priority, setPriority] = useState(task.priority);
-  const [pinned, setPinned] = useState(task.pinned);
-  const [listId, setListId] = useState(task.listId);
-  const [sectionId, setSectionId] = useState(task.sectionId ?? "");
-  const [rrule, setRrule] = useState(task.rrule ?? "");
-  const [tagNames, setTagNames] = useState<string[]>(task.tags.map((tag) => tag.name));
-  const [tagInput, setTagInput] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-
-  const sectionsQuery = useSectionsQuery(listId);
+  const [form, setForm] = useState(() => formFromTask(task));
+  const sectionsQuery = useSectionsQuery(form.listId);
 
   const sidebar = sidebarQuery.data;
   const allLists = sidebar
@@ -71,64 +139,34 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
 
   // Нестандартное правило (через api или quick-add) показываем отдельной опцией.
   const repeatOptions =
-    rrule !== "" && !REPEAT_OPTIONS.some((option) => option.value === rrule)
-      ? [{ value: rrule, label: rruleValueLabel(rrule) }, ...REPEAT_OPTIONS]
+    form.rrule !== "" && !REPEAT_OPTIONS.some((option) => option.value === form.rrule)
+      ? [{ value: form.rrule, label: rruleValueLabel(form.rrule) }, ...REPEAT_OPTIONS]
       : REPEAT_OPTIONS;
 
-  const tagsChanged =
-    [...tagNames].sort().join("\n") !==
-    task.tags
-      .map((tag) => tag.name)
-      .sort()
-      .join("\n");
+  const patch = useMemo(() => buildPatch(task, form, timezone), [task, form, timezone]);
+  const patchRef = useRef(patch);
+  patchRef.current = patch;
 
-  function addTag(raw: string) {
-    const name = raw.trim().replace(/^#/, "");
-    if (name.length === 0) return;
-    if (tagNames.some((existing) => existing.toLowerCase() === name.toLowerCase())) {
-      setTagInput("");
-      return;
-    }
-    if (tagNames.length >= 20) {
-      setError("Максимум 20 тегов на задачу");
-      return;
-    }
-    setError(null);
-    setTagNames([...tagNames, name]);
-    setTagInput("");
-  }
+  // Автосейв: тихий PATCH через паузу после последней правки.
+  useEffect(() => {
+    if (!patch) return;
+    const timer = setTimeout(() => {
+      update.mutate({ taskId: task.id, ...patchRef.current! });
+    }, AUTOSAVE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [patch, task.id, update]);
 
-  async function save() {
-    if (title.trim().length === 0) {
-      setError("Название не может быть пустым");
-      return;
-    }
-    // Повтор требует даты: без явной даты отсчёт с сегодняшнего дня.
-    const effectiveDueDate =
-      dueDate === "" && rrule !== "" ? todayInZone(new Date(), timezone) : dueDate;
-    try {
-      await update.mutateAsync({
-        taskId: task.id,
-        title: title.trim(),
-        description,
-        dueDate: effectiveDueDate === "" ? null : effectiveDueDate,
-        dueTime: effectiveDueDate === "" || dueTime === "" ? null : dueTime,
-        priority,
-        pinned,
-        ...(listId !== task.listId ? { listId } : {}),
-        ...(sectionId !== (task.sectionId ?? "")
-          ? { sectionId: sectionId === "" ? null : sectionId }
-          : {}),
-        ...(rrule !== (task.rrule ?? "") ? { rrule: rrule === "" ? null : rrule } : {}),
-        ...(tagsChanged ? { tagNames } : {}),
-      });
-      setError(null);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1500);
-    } catch (cause) {
-      setError(errorMessage(cause));
-    }
-  }
+  // Смена задачи/закрытие панели: несохранённое уходит сразу (fire-and-forget).
+  useEffect(
+    () => () => {
+      if (patchRef.current) {
+        update.mutate({ taskId: task.id, ...patchRef.current });
+      }
+    },
+    // Только при размонтировании: панель пересоздаётся key={task.id}.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   async function toggleComplete() {
     try {
@@ -137,32 +175,57 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
       } else {
         await uncomplete.mutateAsync(task.id);
       }
-    } catch (cause) {
-      setError(errorMessage(cause));
+    } catch {
+      // Ошибки мутаций видны через isError/error ниже.
     }
   }
 
   async function undoLastCompletion() {
     try {
       await uncomplete.mutateAsync(task.id);
-    } catch (cause) {
-      setError(errorMessage(cause));
+    } catch {
+      // Ошибки мутаций видны через isError/error ниже.
     }
   }
 
-  async function remove() {
-    try {
-      await trash.mutateAsync(task.id);
-      onClose();
-    } catch (cause) {
-      setError(errorMessage(cause));
+  /** Строки «YYYY-MM-DD» + «HH:mm» ⇄ Date (в локальной зоне браузера). */
+  const dueDateTime =
+    form.dueDate !== ""
+      ? new Date(`${form.dueDate}T${form.dueTime !== "" ? form.dueTime : "00:00"}`)
+      : undefined;
+
+  function handleDateTimeSelect(next: Date | undefined) {
+    if (!next) {
+      setForm((state) => ({ ...state, dueDate: "", dueTime: "" }));
+      return;
     }
+    const year = next.getFullYear();
+    const month = String(next.getMonth() + 1).padStart(2, "0");
+    const day = String(next.getDate()).padStart(2, "0");
+    setForm((state) => ({
+      ...state,
+      dueDate: `${year}-${month}-${day}`,
+      dueTime: `${String(next.getHours()).padStart(2, "0")}:${String(next.getMinutes()).padStart(2, "0")}`,
+    }));
   }
+
+  function toggleTag(name: string) {
+    setForm((state) => {
+      const exists = state.tagNames.some((tag) => tag.toLowerCase() === name.toLowerCase());
+      if (exists) {
+        return { ...state, tagNames: state.tagNames.filter((tag) => tag !== name) };
+      }
+      if (state.tagNames.length >= 20) return state;
+      return { ...state, tagNames: [...state.tagNames, name] };
+    });
+  }
+
+  const saveError = update.isError ? errorMessage(update.error) : null;
 
   return (
     <motion.aside
       aria-label="Детали задачи"
-      className="sticky top-6 flex w-[320px] shrink-0 flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-sm max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-40 max-md:w-auto max-md:rounded-t-xl max-md:shadow-lg"
+      className="fixed top-0 right-0 z-40 flex h-dvh w-[340px] shrink-0 flex-col gap-4 overflow-y-auto rounded-l-xl border border-border bg-card p-4 shadow-lg max-md:inset-x-0 max-md:top-auto max-md:bottom-0 max-md:h-auto max-md:max-h-[80dvh] max-md:rounded-t-xl max-md:rounded-l-none max-md:border-t max-md:border-l-0"
       initial={prefersReducedMotion ? false : { opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
       exit={prefersReducedMotion ? undefined : { opacity: 0, x: 16 }}
@@ -184,8 +247,8 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
         <Label htmlFor="details-title">Название</Label>
         <Input
           id="details-title"
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
+          value={form.title}
+          onChange={(event) => setForm((state) => ({ ...state, title: event.target.value }))}
         />
       </div>
 
@@ -194,157 +257,115 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
         <Textarea
           id="details-description"
           rows={4}
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
+          value={form.description}
+          onChange={(event) => setForm((state) => ({ ...state, description: event.target.value }))}
           placeholder="Markdown-описание"
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="details-date">Дата</Label>
-          <Input
-            id="details-date"
-            type="date"
-            value={dueDate}
-            onChange={(event) => setDueDate(event.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="details-time">Время</Label>
-          <Input
-            id="details-time"
-            type="time"
-            value={dueTime}
-            onChange={(event) => setDueTime(event.target.value)}
-          />
-        </div>
+      <div className="flex flex-col gap-1.5">
+        <Label>Дата и время</Label>
+        <DateTimePicker
+          date={dueDateTime}
+          onSelect={handleDateTimeSelect}
+          placeholder="Без даты"
+          clearable
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="details-priority">Приоритет</Label>
         <Select
           id="details-priority"
-          value={priority}
-          onChange={(event) => setPriority(event.target.value as TaskDto["priority"])}
-        >
-          {TASK_PRIORITIES.map((value) => (
-            <option key={value} value={value}>
-              {TASK_PRIORITY_LABELS_RU[value]}
-            </option>
-          ))}
-        </Select>
+          options={TASK_PRIORITIES.map((value) => ({
+            value,
+            label: TASK_PRIORITY_LABELS_RU[value],
+          }))}
+          value={form.priority}
+          onChange={(priority) => setForm((state) => ({ ...state, priority }))}
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="details-list">Список</Label>
         <Select
           id="details-list"
-          value={listId}
-          onChange={(event) => {
-            setListId(event.target.value);
-            setSectionId("");
-          }}
-        >
-          {allLists.map((list) => (
-            <option key={list.id} value={list.id}>
-              {list.name}
-            </option>
-          ))}
-        </Select>
+          options={allLists.map((list) => ({ value: list.id, label: list.name }))}
+          value={form.listId}
+          onChange={(nextListId) =>
+            setForm((state) => ({ ...state, listId: nextListId, sectionId: "" }))
+          }
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="details-section">Секция</Label>
         <Select
           id="details-section"
-          value={sectionId}
-          onChange={(event) => setSectionId(event.target.value)}
-        >
-          <option value="">Без секции</option>
-          {sections.map((section) => (
-            <option key={section.id} value={section.id}>
-              {section.name}
-            </option>
-          ))}
-        </Select>
+          options={[
+            { value: "", label: "Без секции" },
+            ...sections.map((section) => ({ value: section.id, label: section.name })),
+          ]}
+          value={form.sectionId}
+          onChange={(sectionId) => setForm((state) => ({ ...state, sectionId }))}
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="details-repeat">Повтор</Label>
         <Select
           id="details-repeat"
-          value={rrule}
-          onChange={(event) => setRrule(event.target.value)}
-        >
-          {repeatOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
+          options={repeatOptions}
+          value={form.rrule}
+          onChange={(rrule) => setForm((state) => ({ ...state, rrule }))}
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="details-tag-input">Теги</Label>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {tagNames.map((name) => (
-            <span
-              className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium"
-              key={name}
-            >
-              #{name}
-              <button
-                aria-label={`Убрать тег ${name}`}
-                title="Убрать тег"
-                type="button"
-                className="cursor-pointer rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-                onClick={() => setTagNames(tagNames.filter((tag) => tag !== name))}
-              >
-                <XIcon className="size-3" />
-              </button>
-            </span>
-          ))}
-          <Input
-            className="min-h-8 w-32 flex-1"
-            id="details-tag-input"
-            aria-label="Добавить тег"
-            list="tag-options"
-            placeholder="Добавить тег…"
-            value={tagInput}
-            onChange={(event) => setTagInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === ",") {
-                event.preventDefault();
-                addTag(tagInput);
-              }
-            }}
-            onBlur={() => addTag(tagInput)}
-          />
-          <datalist id="tag-options">
-            {(tagsQuery.data ?? [])
+        <Label>Теги</Label>
+        <MultiSelect
+          ariaLabel="Теги задачи"
+          placeholder="Нет тегов"
+          searchPlaceholder="Найти или создать тег…"
+          options={[
+            ...(tagsQuery.data ?? []).map((tag) => ({
+              value: tag.name,
+              label: tag.name,
+              selected: form.tagNames.some((name) => name.toLowerCase() === tag.name.toLowerCase()),
+              leading: <EntityMarker icon={tag.icon} color={tag.color} />,
+            })),
+            // Тег создан через «Создать», но ещё не вернулся из запроса — рисуем чип сразу.
+            ...form.tagNames
               .filter(
-                (tag) => !tagNames.some((name) => name.toLowerCase() === tag.name.toLowerCase()),
+                (name) =>
+                  !(tagsQuery.data ?? []).some(
+                    (tag) => tag.name.toLowerCase() === name.toLowerCase(),
+                  ),
               )
-              .map((tag) => (
-                <option key={tag.id} value={tag.name} />
-              ))}
-          </datalist>
-        </div>
+              .map((name) => ({
+                value: name,
+                label: name,
+                selected: true,
+                leading: <ColorDot color="gray" />,
+              })),
+          ]}
+          onToggle={toggleTag}
+          onCreate={(name) => toggleTag(name.trim())}
+        />
       </div>
 
       <label className="flex items-center gap-2 text-sm">
-        <Checkbox checked={pinned} onCheckedChange={setPinned} aria-label="Закреплено" />
+        <Checkbox
+          checked={form.pinned}
+          onCheckedChange={(pinned) => setForm((state) => ({ ...state, pinned }))}
+          aria-label="Закреплено"
+        />
         Закреплено
       </label>
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {saved ? <p className="text-sm text-success">Сохранено</p> : null}
+      {saveError ? <p className="text-sm text-destructive">{saveError}</p> : null}
 
       <div className="mt-auto flex flex-col gap-2">
-        <Button onClick={() => void save()} disabled={update.isPending}>
-          Сохранить
-        </Button>
         {task.rrule === null ? (
           <Button variant="secondary" onClick={() => void toggleComplete()}>
             {task.completedAt ? "Вернуть в работу" : "Завершить"}
@@ -359,9 +380,6 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
             </Button>
           </>
         )}
-        <Button variant="danger" onClick={() => void remove()}>
-          В корзину
-        </Button>
       </div>
     </motion.aside>
   );

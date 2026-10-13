@@ -121,6 +121,19 @@ describe("структура: папки, списки, секции (e2e)", () 
     expect(renamed.name).toBe("Проект X");
     expect(renamed.color).toBe("teal");
 
+    // Иконка списка: валидный ключ и отбраковка произвольных строк.
+    const withIcon = listSchema.parse(
+      (
+        await http()
+          .patch(`/v1/lists/${project.id}`)
+          .set(auth())
+          .send({ icon: "briefcase" })
+          .expect(200)
+      ).body,
+    );
+    expect(withIcon.icon).toBe("briefcase");
+    await http().patch(`/v1/lists/${project.id}`).set(auth()).send({ icon: "rocket" }).expect(400);
+
     await http()
       .post("/v1/lists")
       .set(auth())

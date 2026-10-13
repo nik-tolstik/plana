@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ChevronDownIcon } from "lucide-react";
 import { AnimatedListItem, staggerDelayMs } from "@/shared/ui";
 import type { TaskGroup } from "../model/grouping";
+import type { TaskEditingState } from "../model/editing";
 import type { TaskDragProps } from "../model/use-drag-reorder";
 import { TaskRow } from "./task-row";
 
@@ -11,10 +12,19 @@ interface TaskGroupBlockProps {
   today: string;
   onOpenDetails: (taskId: string) => void;
   dnd?: TaskDragProps;
+  editing?: TaskEditingState | null;
+  onEditingChange?: (editing: TaskEditingState | null) => void;
 }
 
 /** Сворачиваемая группа задач (дата или секция). */
-export function TaskGroupBlock({ group, today, onOpenDetails, dnd }: TaskGroupBlockProps) {
+export function TaskGroupBlock({
+  group,
+  today,
+  onOpenDetails,
+  dnd,
+  editing,
+  onEditingChange,
+}: TaskGroupBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
@@ -55,6 +65,8 @@ export function TaskGroupBlock({ group, today, onOpenDetails, dnd }: TaskGroupBl
                   onOpenDetails={onOpenDetails}
                   dnd={dnd}
                   delayMs={staggerDelayMs(index)}
+                  editing={editing}
+                  onEditingChange={onEditingChange}
                 />
               ))}
             </motion.ul>

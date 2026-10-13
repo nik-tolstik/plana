@@ -4,7 +4,7 @@ import { useDeleteHabitEntry, useSetHabitEntry, useUpdateHabit } from "@/feature
 import { cn } from "@/shared/lib/cn";
 import { Button, Checkbox } from "@/shared/ui";
 import { HabitCalendar } from "./habit-calendar";
-import { LIST_DOT_COLORS } from "@/widgets/sidebar/model/colors";
+import { ENTITY_COLORS } from "@/shared/ui";
 import type { MonthCursor } from "../model/calendar";
 
 interface HabitCardProps {
@@ -58,7 +58,7 @@ export function HabitCard({ habit, cursor, today }: HabitCardProps) {
       <header className="flex flex-wrap items-center gap-2">
         <span
           className="size-2.5 shrink-0 rounded-full"
-          style={{ background: LIST_DOT_COLORS[habit.color] }}
+          style={{ background: ENTITY_COLORS[habit.color] }}
           aria-hidden="true"
         />
         <h2 className="text-base font-semibold">{habit.name}</h2>

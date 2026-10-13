@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { taskKeys } from "@/entities/task";
 import { tagKeys } from "@/entities/tag";
+import { playCompletionSound } from "@/shared/lib/completion-sound";
 import {
   apiCompleteTask,
   apiCreateSubtask,
@@ -50,6 +51,8 @@ export function useCompleteTask() {
   return useMutation({
     mutationFn: apiCompleteTask,
     onSuccess: invalidate,
+    // Любой способ завершения (чекбокс, панель, ПКМ) даёт звуковое подтверждение.
+    onMutate: () => playCompletionSound(),
   });
 }
 

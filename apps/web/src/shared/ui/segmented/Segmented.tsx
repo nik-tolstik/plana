@@ -73,11 +73,27 @@ export function Segmented<TValue extends string | number = string>({
       role="radiogroup"
       data-slot="segmented"
       className={cn(
-        "inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-lg bg-segmented p-0.5",
+        "relative isolate inline-flex min-w-0 max-w-full items-stretch gap-0.5 rounded-lg bg-segmented p-0.5",
         disabled && "pointer-events-none opacity-50",
         className,
       )}
     >
+      {indicator.width > 0 ? (
+        <motion.span
+          aria-hidden="true"
+          className="pointer-events-none absolute rounded-md bg-segmented-indicator shadow-sm"
+          initial={false}
+          animate={{
+            height: indicator.height,
+            left: indicator.left,
+            top: indicator.top,
+            width: indicator.width,
+          }}
+          transition={
+            prefersReducedMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 40 }
+          }
+        />
+      ) : null}
       {options.map((option, index) => {
         const isSelected = index === activeIndex;
         return (
@@ -87,29 +103,11 @@ export function Segmented<TValue extends string | number = string>({
               optionRefs.current[index] = node;
             }}
             className={cn(
-              "relative z-10 flex cursor-pointer items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors select-none",
+              "relative z-10 flex min-w-0 cursor-pointer items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors select-none",
               isSelected ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               option.disabled && "pointer-events-none opacity-50",
             )}
           >
-            {isSelected ? (
-              <motion.span
-                aria-hidden="true"
-                className="absolute inset-0 -z-10 rounded-md bg-segmented-indicator shadow-sm"
-                initial={false}
-                animate={{
-                  height: indicator.height,
-                  left: indicator.left,
-                  top: indicator.top,
-                  width: indicator.width,
-                }}
-                transition={
-                  prefersReducedMotion
-                    ? { duration: 0 }
-                    : { type: "spring", stiffness: 500, damping: 40 }
-                }
-              />
-            ) : null}
             <input
               type="radio"
               name={groupName}

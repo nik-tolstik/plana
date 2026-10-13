@@ -1,1 +1,1 @@
-export { useDeleteTag, useUpdateTag } from "./model/use-tag-mutations";
+export { useCreateTag, useDeleteTag, useUpdateTag } from "./model/use-tag-mutations";

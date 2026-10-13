@@ -55,6 +55,8 @@ export function groupByDueDate(tasks: TaskDto[], today: string): TaskGroup[] {
 
 /** Группировка по секциям списка; задачи без секции — последняя группа. */
 export function groupBySections(tasks: TaskDto[], sections: SectionDto[]): TaskGroup[] {
+  // Пустые секции показываем: пользователь только что создал её и должен
+  // видеть результат, даже пока в ней нет задач.
   const groups: TaskGroup[] = sections.map((section) => ({
     key: section.id,
     title: section.name,
@@ -70,7 +72,7 @@ export function groupBySections(tasks: TaskDto[], sections: SectionDto[]): TaskG
     }
   }
   if (noSection.length) groups.push({ key: "no-section", title: "Без секции", tasks: noSection });
-  return groups.filter((group) => group.tasks.length > 0);
+  return groups;
 }
 
 /** Короткая подпись даты задачи для строки: «Сегодня», «12 окт» (+ время). */

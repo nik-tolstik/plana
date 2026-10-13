@@ -21,8 +21,9 @@ export function toListDto(row: ListRow): ListDto {
     id: row.id,
     folderId: row.folderId,
     name: row.name,
-    // Колонка text, реестр значений — палитра из @plana/shared (пишем только через схемы).
+    // Колонки text, реестр значений — палитра из @plana/shared (пишем только через схемы).
     color: row.color as ListDto["color"],
+    icon: (row.icon as ListDto["icon"]) ?? null,
     emoji: row.emoji,
     kind: row.kind,
     position: row.position,
@@ -86,6 +87,7 @@ export class ListsService {
         folderId,
         name: dto.name,
         color: dto.color ?? "gray",
+        icon: dto.icon ?? null,
         emoji: dto.emoji ?? null,
         position,
       })
@@ -128,6 +130,9 @@ export class ListsService {
     }
     if (dto.color !== undefined) {
       values.color = dto.color;
+    }
+    if (dto.icon !== undefined) {
+      values.icon = dto.icon;
     }
     if (dto.emoji !== undefined) {
       values.emoji = dto.emoji;

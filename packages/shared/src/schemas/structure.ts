@@ -17,6 +17,32 @@ export const listColorSchema = z.enum(LIST_COLORS);
 
 export type ListColor = z.infer<typeof listColorSchema>;
 
+/** Ключи иконок списков и тегов; фронтенд рендерит lucide-иконку по ключу. */
+export const ENTITY_ICONS = [
+  "list",
+  "inbox",
+  "calendar",
+  "briefcase",
+  "home",
+  "cart",
+  "book",
+  "study",
+  "fitness",
+  "food",
+  "travel",
+  "pet",
+  "music",
+  "palette",
+  "code",
+  "finance",
+  "heart",
+  "target",
+] as const;
+
+export const entityIconSchema = z.enum(ENTITY_ICONS);
+
+export type EntityIcon = z.infer<typeof entityIconSchema>;
+
 const nameSchema = z.string().trim().min(1, "Название не может быть пустым").max(100);
 
 // Один эмодзи-символ (по UTF-16 юнитам до 8 — покрывает любые эмодзи с модификаторами).
@@ -39,6 +65,7 @@ export const listSchema = z.object({
   folderId: z.uuid().nullable(),
   name: z.string(),
   color: listColorSchema,
+  icon: entityIconSchema.nullable(),
   emoji: z.string().nullable(),
   kind: z.enum(["inbox", "regular"]),
   position: z.number().int(),
@@ -93,6 +120,7 @@ export type PatchFolderDto = z.infer<typeof patchFolderSchema>;
 export const createListSchema = z.object({
   name: nameSchema,
   color: listColorSchema.optional(),
+  icon: entityIconSchema.nullable().optional(),
   emoji: emojiSchema.nullable().optional(),
   folderId: z.uuid().nullable().optional(),
 });
@@ -103,6 +131,7 @@ export const patchListSchema = z
   .object({
     name: nameSchema.optional(),
     color: listColorSchema.optional(),
+    icon: entityIconSchema.nullable().optional(),
     emoji: emojiSchema.nullable().optional(),
     // null = вынести из папки в корень.
     folderId: z.uuid().nullable().optional(),

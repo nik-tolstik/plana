@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { entityIconSchema, listColorSchema } from "./structure.js";
 
 /** Имя тега: 1..50 символов; уникальность в рамках пользователя по lower(name). */
 export const tagNameSchema = z.string().trim().min(1, "Имя тега не может быть пустым").max(50);
@@ -10,6 +11,8 @@ const nameSchema = tagNameSchema;
 export const tagSchema = z.object({
   id: z.uuid(),
   name: z.string(),
+  color: listColorSchema,
+  icon: entityIconSchema.nullable(),
   position: z.number().int(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
@@ -21,11 +24,21 @@ export type TagDto = z.infer<typeof tagSchema>;
 export const taskTagSchema = z.object({
   id: z.uuid(),
   name: z.string(),
+  color: listColorSchema,
+  icon: entityIconSchema.nullable(),
 });
 
 export type TaskTagDto = z.infer<typeof taskTagSchema>;
 
 // --- Запросы ---
+
+export const createTagSchema = z.object({
+  name: nameSchema,
+  color: listColorSchema.optional(),
+  icon: entityIconSchema.nullable().optional(),
+});
+
+export type CreateTagDto = z.infer<typeof createTagSchema>;
 
 /**
  * position — целевой индекс (0-based) среди тегов пользователя;
@@ -34,6 +47,8 @@ export type TaskTagDto = z.infer<typeof taskTagSchema>;
 export const patchTagSchema = z
   .object({
     name: nameSchema.optional(),
+    color: listColorSchema.optional(),
+    icon: entityIconSchema.nullable().optional(),
     position: z.number().int().min(0).optional(),
   })
   .refine((value) => Object.keys(value).length > 0, { message: "Хотя бы одно поле обязательно" });

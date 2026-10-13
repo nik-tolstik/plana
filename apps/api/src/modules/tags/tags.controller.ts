@@ -7,9 +7,10 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
 } from "@nestjs/common";
-import type { PatchTagDto, TagDto } from "@plana/shared";
-import { patchTagSchema } from "@plana/shared";
+import type { CreateTagDto, PatchTagDto, TagDto } from "@plana/shared";
+import { createTagSchema, patchTagSchema } from "@plana/shared";
 import { CurrentUserId } from "../../common/current-user-id.decorator";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe";
 import { TagsService } from "./tags.service";
@@ -21,6 +22,14 @@ export class TagsController {
   @Get("tags")
   findAll(@CurrentUserId() userId: string): Promise<TagDto[]> {
     return this.tagsService.findAll(userId);
+  }
+
+  @Post("tags")
+  create(
+    @CurrentUserId() userId: string,
+    @Body(new ZodValidationPipe(createTagSchema)) dto: CreateTagDto,
+  ): Promise<TagDto> {
+    return this.tagsService.create(userId, dto);
   }
 
   @Patch("tags/:id")

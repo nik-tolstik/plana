@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence } from "motion/react";
-import { todayInZone, type SmartListKey } from "@plana/shared";
+import { addDays, todayInZone, type SmartListKey } from "@plana/shared";
 import { useTasksQuery, useUserTimezone } from "@/entities/task";
 import { QuickAdd } from "@/features/quick-add";
 import { PageFade, Skeleton } from "@/shared/ui";
@@ -28,6 +28,10 @@ export function SmartPage({ smart }: SmartPageProps) {
   const [detailsTaskId, setDetailsTaskId] = useState<string | null>(null);
 
   const today = todayInZone(new Date(), timezone);
+  // Задачи с «Сегодня»/«Завтра» без явной даты получают дату страницы —
+  // иначе они не попадают в выборку умного списка и «не добавляются».
+  const defaultDueDate =
+    smart === "today" ? today : smart === "tomorrow" ? addDays(today, 1) : undefined;
   const tasks = tasksQuery.data?.items ?? [];
   const groups = useMemo(() => {
     if (smart === "completed" || smart === "trash") {
@@ -44,7 +48,9 @@ export function SmartPage({ smart }: SmartPageProps) {
           <h1 className="mb-3 text-xl font-semibold">{SMART_TITLES[smart]}</h1>
         </header>
 
-        {smart !== "completed" && smart !== "trash" ? <QuickAdd /> : null}
+        {smart !== "completed" && smart !== "trash" ? (
+          <QuickAdd defaultDueDate={defaultDueDate} />
+        ) : null}
 
         {tasksQuery.isPending ? (
           <div className="flex flex-col gap-2">
