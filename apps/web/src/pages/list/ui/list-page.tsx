@@ -1,26 +1,32 @@
 import { useMemo, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { CheckIcon, PlusIcon, XIcon } from "lucide-react";
+import { AnimatePresence } from "motion/react";
 import { Link, useParams } from "react-router";
 import { todayInZone } from "@plana/shared";
-import { useSectionsQuery, useSidebarQuery } from "@/entities/list";
+import { useSidebarQuery } from "@/entities/list";
 import { useTasksQuery, useUserTimezone } from "@/entities/task";
-import { useCreateSection } from "@/features/structure-manage";
 import { QuickAdd } from "@/features/quick-add";
-import { Input, PageFade, Skeleton } from "@/shared/ui";
+import { PageFade, Skeleton } from "@/shared/ui";
 import { TaskDetails } from "@/widgets/task-details";
-import { groupBySections, TaskListView, useTaskDragReorder } from "@/widgets/task-list";
+import { TaskListView, useTaskDragReorder } from "@/widgets/task-list";
+import {
+  ListDisplaySettingsButton,
+  groupByDueDate,
+  groupByPriority,
+  sortTasksFor,
+  type ListDisplaySettings,
+  loadListDisplay,
+  saveListDisplay,
+} from "@/widgets/task-list";
 
 export function ListPage() {
   const { listId } = useParams<{ listId: string }>();
   const sidebarQuery = useSidebarQuery();
-  const sectionsQuery = useSectionsQuery(listId);
   const tasksQuery = useTasksQuery(listId ? { listId } : { smart: "all" });
   const timezone = useUserTimezone();
   const [detailsTaskId, setDetailsTaskId] = useState<string | null>(null);
-  const [addingSection, setAddingSection] = useState(false);
-  const createSection = useCreateSection(listId ?? "");
-  const prefersReducedMotion = useReducedMotion();
+  const [display, setDisplay] = useState<ListDisplaySettings>(() =>
+    loadListDisplay(listId ?? "none"),
+  );
 
   const sidebar = sidebarQuery.data;
   const list = useMemo(() => {
@@ -34,13 +40,31 @@ export function ListPage() {
 
   const today = todayInZone(new Date(), timezone);
   const tasks = tasksQuery.data?.items ?? [];
-  const groups = useMemo(
-    () => groupBySections(tasks, sectionsQuery.data ?? []),
-    [tasks, sectionsQuery.data],
-  );
-  // Перетаскивание доступно только на страницах списков.
-  const dnd = useTaskDragReorder({ enabled: listId !== undefined, tasks });
+
+  // Группировка и порядок задач — настройки страницы списка.
+  const groups = useMemo(() => {
+    if (tasks.length === 0) return [];
+    const grouped =
+      display.group === "date"
+        ? groupByDueDate(tasks, today)
+        : display.group === "priority"
+          ? groupByPriority(tasks)
+          : [{ key: "all", title: "", tasks }];
+    return grouped.map((group) => ({ ...group, tasks: sortTasksFor(group.tasks, display.sort) }));
+  }, [tasks, today, display]);
+
+  // Перетаскивание доступно только при ручном порядке: имена групп и явные
+  // сортировки конфликтуют с позиционным reorder.
+  const manualOrder = display.group === "none" && display.sort === "manual";
+  const dnd = useTaskDragReorder({ enabled: manualOrder && listId !== undefined, tasks });
   const detailsTask = tasks.find((task) => task.id === detailsTaskId);
+
+  function changeDisplay(next: ListDisplaySettings) {
+    setDisplay(next);
+    if (listId !== undefined) {
+      saveListDisplay(listId, next);
+    }
+  }
 
   if (sidebar && !list) {
     return (
@@ -58,67 +82,12 @@ export function ListPage() {
     <div className="flex w-full items-start gap-6">
       <PageFade className="min-w-0 flex-1 flex-col gap-3">
         <header className="mb-3 flex items-center gap-1">
-          <h1 className="min-w-0 truncate text-xl font-semibold">
+          <h1 className="min-w-0 flex-1 truncate text-xl font-semibold">
             {list?.emoji ? `${list.emoji} ` : ""}
             {list?.name ?? "…"}
           </h1>
-          <button
-            type="button"
-            title="Добавить секцию"
-            aria-label="Добавить секцию"
-            onClick={() => setAddingSection(true)}
-            className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
-          >
-            <PlusIcon className="size-4" />
-          </button>
+          <ListDisplaySettingsButton settings={display} onChange={changeDisplay} />
         </header>
-
-        <AnimatePresence initial={false}>
-          {addingSection ? (
-            <motion.form
-              key="add-section"
-              className="flex items-center gap-1"
-              initial={prefersReducedMotion ? false : { height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-              onSubmit={(event) => {
-                event.preventDefault();
-                const input = event.currentTarget.elements.namedItem(
-                  "name",
-                ) as HTMLInputElement | null;
-                const name = input?.value.trim() ?? "";
-                if (name.length === 0 || !input) return;
-                void createSection.mutateAsync(name).then(() => {
-                  input.value = "";
-                });
-              }}
-            >
-              <Input
-                aria-label="Название секции"
-                name="name"
-                placeholder="Название секции"
-                className="min-h-8"
-                autoFocus
-              />
-              <button
-                className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
-                type="submit"
-                title="Добавить"
-              >
-                <CheckIcon className="size-4" />
-              </button>
-              <button
-                className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
-                onClick={() => setAddingSection(false)}
-                type="button"
-                title="Отмена"
-              >
-                <XIcon className="size-4" />
-              </button>
-            </motion.form>
-          ) : null}
-        </AnimatePresence>
 
         <QuickAdd defaultListId={listId} />
 
@@ -134,6 +103,10 @@ export function ListPage() {
         ) : null}
 
         <TaskListView groups={groups} today={today} onOpenDetails={setDetailsTaskId} dnd={dnd} />
+
+        {!tasksQuery.isPending && tasks.length === 0 ? (
+          <p className="py-8 text-center text-muted-foreground">В этом списке пока нет задач</p>
+        ) : null}
       </PageFade>
 
       <AnimatePresence>

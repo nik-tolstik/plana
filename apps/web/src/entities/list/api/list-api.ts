@@ -1,21 +1,10 @@
-import type { ListDto, SectionDto, SidebarDto } from "@plana/shared";
-import {
-  createListSchema,
-  listSchema,
-  patchListSchema,
-  sectionSchema,
-  sidebarDtoSchema,
-} from "@plana/shared";
+import type { ListDto, SidebarDto } from "@plana/shared";
+import { createListSchema, listSchema, patchListSchema, sidebarDtoSchema } from "@plana/shared";
 import { apiClient } from "@/shared/api/client";
-import { z } from "zod";
 
 /** Дерево сайдбара одним запросом (GET /v1/folders). */
 export function apiGetSidebar(): Promise<SidebarDto> {
   return apiClient.get("/v1/folders", sidebarDtoSchema);
-}
-
-export function apiListSections(listId: string): Promise<SectionDto[]> {
-  return apiClient.get(`/v1/lists/${listId}/sections`, z.array(sectionSchema));
 }
 
 export function apiCreateList(input: typeof createListSchema._input): Promise<ListDto> {

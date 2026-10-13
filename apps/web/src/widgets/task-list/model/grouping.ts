@@ -1,5 +1,5 @@
 import { addDays, compareDays } from "@plana/shared";
-import type { SectionDto, TaskDto } from "@plana/shared";
+import type { TaskDto, TaskPriority } from "@plana/shared";
 
 export interface TaskGroup {
   key: string;
@@ -53,26 +53,59 @@ export function groupByDueDate(tasks: TaskDto[], today: string): TaskGroup[] {
   return groups;
 }
 
-/** Группировка по секциям списка; задачи без секции — последняя группа. */
-export function groupBySections(tasks: TaskDto[], sections: SectionDto[]): TaskGroup[] {
-  // Пустые секции показываем: пользователь только что создал её и должен
-  // видеть результат, даже пока в ней нет задач.
-  const groups: TaskGroup[] = sections.map((section) => ({
-    key: section.id,
-    title: section.name,
-    tasks: [],
-  }));
-  const noSection: TaskDto[] = [];
-  const byId = new Map(groups.map((group) => [group.key, group]));
+const PRIORITY_GROUP_ORDER: TaskPriority[] = ["high", "medium", "low", "none"];
+const PRIORITY_GROUP_TITLES: Record<TaskPriority, string> = {
+  high: "Высокий",
+  medium: "Средний",
+  low: "Низкий",
+  none: "Без приоритета",
+};
+
+/** Группировка по приоритету: Высокий → Средний → Низкий → Без приоритета. */
+export function groupByPriority(tasks: TaskDto[]): TaskGroup[] {
+  const buckets = new Map<TaskPriority, TaskDto[]>(PRIORITY_GROUP_ORDER.map((p) => [p, []]));
   for (const task of tasks) {
-    if (task.sectionId && byId.has(task.sectionId)) {
-      byId.get(task.sectionId)!.tasks.push(task);
-    } else {
-      noSection.push(task);
-    }
+    buckets.get(task.priority)?.push(task);
   }
-  if (noSection.length) groups.push({ key: "no-section", title: "Без секции", tasks: noSection });
-  return groups;
+  return PRIORITY_GROUP_ORDER.filter((priority) => (buckets.get(priority) ?? []).length > 0).map(
+    (priority) => ({
+      key: `priority-${priority}`,
+      title: PRIORITY_GROUP_TITLES[priority],
+      tasks: buckets.get(priority) ?? [],
+    }),
+  );
+}
+
+/** Вес приоритета для сортировки: выше приоритет — меньше вес. */
+const PRIORITY_WEIGHT: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2, none: 3 };
+
+/**
+ * Порядок задач внутри списка/группы. «Вручную» — позиционный порядок
+ * (как отдал сервер, перестановка drag-n-drop); остальные — явные ключи.
+ */
+export function sortTasksFor(
+  tasks: TaskDto[],
+  sort: "manual" | "date" | "priority" | "title",
+): TaskDto[] {
+  const copy = [...tasks];
+  switch (sort) {
+    case "manual":
+      return copy;
+    case "date":
+      // Без даты — в конец; из двух дат раньше та, что меньше.
+      return copy.sort((a, b) => {
+        if (a.dueDate === null && b.dueDate === null) return 0;
+        if (a.dueDate === null) return 1;
+        if (b.dueDate === null) return -1;
+        const byDay = compareDays(a.dueDate, b.dueDate);
+        if (byDay !== 0) return byDay;
+        return (a.dueTime ?? "").localeCompare(b.dueTime ?? "");
+      });
+    case "priority":
+      return copy.sort((a, b) => PRIORITY_WEIGHT[a.priority] - PRIORITY_WEIGHT[b.priority]);
+    case "title":
+      return copy.sort((a, b) => a.title.localeCompare(b.title, "ru"));
+  }
 }
 
 /** Короткая подпись даты задачи для строки: «Сегодня», «12 окт» (+ время). */

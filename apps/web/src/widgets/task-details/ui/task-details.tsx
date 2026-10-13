@@ -9,7 +9,7 @@ import {
   type TaskDto,
   type TaskPriority,
 } from "@plana/shared";
-import { useSectionsQuery, useSidebarQuery } from "@/entities/list";
+import { useSidebarQuery } from "@/entities/list";
 import { useTagsQuery } from "@/entities/tag";
 import { useUserTimezone } from "@/entities/task";
 import { useCompleteTask, useUncompleteTask, useUpdateTask } from "@/features/task-manage";
@@ -54,7 +54,6 @@ interface DetailsFormState {
   priority: TaskPriority;
   pinned: boolean;
   listId: string;
-  sectionId: string;
   rrule: string;
   tagNames: string[];
 }
@@ -68,7 +67,6 @@ function formFromTask(task: TaskDto): DetailsFormState {
     priority: task.priority,
     pinned: task.pinned,
     listId: task.listId,
-    sectionId: task.sectionId ?? "",
     rrule: task.rrule ?? "",
     tagNames: task.tags.map((tag) => tag.name),
   };
@@ -100,9 +98,7 @@ function buildPatch(
   if (form.listId !== task.listId) {
     // Перенос в другой список сбрасывает секцию (секции принадлежат списку).
     patch.listId = form.listId;
-    patch.sectionId = form.sectionId === "" ? null : form.sectionId;
-  } else if (form.sectionId !== (task.sectionId ?? "")) {
-    patch.sectionId = form.sectionId === "" ? null : form.sectionId;
+    patch.sectionId = null;
   }
   if (form.rrule !== (task.rrule ?? "")) patch.rrule = form.rrule === "" ? null : form.rrule;
   const tagsChanged =
@@ -129,13 +125,11 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
   const prefersReducedMotion = useReducedMotion();
 
   const [form, setForm] = useState(() => formFromTask(task));
-  const sectionsQuery = useSectionsQuery(form.listId);
 
   const sidebar = sidebarQuery.data;
   const allLists = sidebar
     ? [sidebar.inbox, ...sidebar.rootLists, ...sidebar.folders.flatMap((folder) => folder.lists)]
     : [];
-  const sections = sectionsQuery.data ?? [];
 
   // Нестандартное правило (через api или quick-add) показываем отдельной опцией.
   const repeatOptions =
@@ -292,22 +286,7 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
           id="details-list"
           options={allLists.map((list) => ({ value: list.id, label: list.name }))}
           value={form.listId}
-          onChange={(nextListId) =>
-            setForm((state) => ({ ...state, listId: nextListId, sectionId: "" }))
-          }
-        />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="details-section">Секция</Label>
-        <Select
-          id="details-section"
-          options={[
-            { value: "", label: "Без секции" },
-            ...sections.map((section) => ({ value: section.id, label: section.name })),
-          ]}
-          value={form.sectionId}
-          onChange={(sectionId) => setForm((state) => ({ ...state, sectionId }))}
+          onChange={(nextListId) => setForm((state) => ({ ...state, listId: nextListId }))}
         />
       </div>
 

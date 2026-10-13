@@ -16,7 +16,7 @@ interface TaskGroupBlockProps {
   onEditingChange?: (editing: TaskEditingState | null) => void;
 }
 
-/** Сворачиваемая группа задач (дата или секция). */
+/** Сворачиваемая группа задач (дата, приоритет); без title — плоский список без заголовка. */
 export function TaskGroupBlock({
   group,
   today,
@@ -31,22 +31,24 @@ export function TaskGroupBlock({
   return (
     <AnimatedListItem delayMs={staggerDelayMs(0)}>
       <section>
-        <button
-          className="flex cursor-pointer items-center gap-1 rounded-md px-1 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-          type="button"
-          onClick={() => setCollapsed((value) => !value)}
-        >
-          <motion.span
-            aria-hidden
-            className="flex items-center"
-            animate={{ rotate: collapsed ? -90 : 0 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
+        {group.title !== "" ? (
+          <button
+            className="flex cursor-pointer items-center gap-1 rounded-md px-1 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            type="button"
+            onClick={() => setCollapsed((value) => !value)}
           >
-            <ChevronDownIcon className="size-4" />
-          </motion.span>
-          <span className="font-medium">{group.title}</span>
-          <span className="text-xs">{group.tasks.length}</span>
-        </button>
+            <motion.span
+              aria-hidden
+              className="flex items-center"
+              animate={{ rotate: collapsed ? -90 : 0 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+            >
+              <ChevronDownIcon className="size-4" />
+            </motion.span>
+            <span className="font-medium">{group.title}</span>
+            <span className="text-xs">{group.tasks.length}</span>
+          </button>
+        ) : null}
         <AnimatePresence initial={false}>
           {!collapsed ? (
             <motion.ul
