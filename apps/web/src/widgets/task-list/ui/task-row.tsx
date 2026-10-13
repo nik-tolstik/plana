@@ -3,8 +3,8 @@ import {
   CalendarIcon,
   CheckIcon,
   FlagIcon,
+  GripVerticalIcon,
   ListIcon,
-  PinIcon,
   RepeatIcon,
   RotateCcwIcon,
   TrashIcon,
@@ -18,7 +18,6 @@ import {
   todayInZone,
   type PatchTaskDto,
   type TaskDto,
-  type TaskPriority,
 } from "@plana/shared";
 import { useSidebarQuery } from "@/entities/list";
 import { useUserTimezone } from "@/entities/task";
@@ -33,24 +32,12 @@ import {
 } from "@/features/task-manage";
 import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
-import {
-  Checkbox,
-  ContextMenu,
-  ENTITY_COLORS,
-  EntityMarker,
-  type ContextMenuItem,
-} from "@/shared/ui";
+import { Checkbox, ContextMenu, EntityMarker, type ContextMenuItem } from "@/shared/ui";
+import { PRIORITY_CLASS, TaskDateChip, TaskPriorityChip, TaskTagsChip } from "./task-chips";
 import { SubtasksBlock } from "./subtasks-block";
 import { taskDueLabel } from "../model/grouping";
 import type { TaskEditingState } from "../model/editing";
 import type { TaskDragProps } from "../model/use-drag-reorder";
-
-const PRIORITY_CLASS: Record<TaskPriority, string> = {
-  none: "",
-  low: "text-priority-low",
-  medium: "text-priority-medium",
-  high: "text-priority-high",
-};
 
 interface TaskRowProps {
   task: TaskDto;
@@ -393,11 +380,6 @@ export function TaskRow({
             void patchTask(list.id === task.listId ? {} : { listId: list.id, sectionId: null }),
         })),
       },
-      {
-        label: task.pinned ? "Открепить" : "Закрепить",
-        icon: <PinIcon className="size-4" />,
-        onSelect: () => void patchTask({ pinned: !task.pinned }),
-      },
     );
   }
 
@@ -425,11 +407,18 @@ export function TaskRow({
         <li
           {...menuProps}
           // Клик по строке вне названия и контролов открывает панель деталей.
-          onClick={() => {
-            if (mode === null) onOpenDetails(task.id);
+          // Чипы (тег/дата/приоритет) помечены data-task-chip: их поповеры
+          // рендерятся в портале, а сам триггер гасит всплытие — фильтр
+          // отсекает случаи, когда событие всё же дошло до строки.
+          onClick={(event) => {
+            if (mode === null) {
+              const target = event.target;
+              if (target instanceof Element && target.closest("[data-task-chip]")) return;
+              onOpenDetails(task.id);
+            }
           }}
           className={cn(
-            "relative flex flex-col rounded-lg transition-colors hover:bg-surface-hover",
+            "group relative flex flex-col rounded-lg transition-colors hover:bg-surface-hover",
             task.completedAt !== null && "opacity-60",
             dnd?.draggingId === task.id && "opacity-40",
             dropping && "shadow-[inset_0_2px_0_0_var(--primary)]",
@@ -447,6 +436,13 @@ export function TaskRow({
             transition={{ duration: 0.2, ease: "easeOut", delay: delayMs / 1000 }}
           >
             <div className="flex items-center gap-2 px-2 py-1.5">
+              {dnd ? (
+                // Индикатор перетаскивания: виден при наведении на строку.
+                <GripVerticalIcon
+                  aria-hidden
+                  className="size-4 shrink-0 cursor-grab text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                />
+              ) : null}
               <Checkbox
                 size="lg"
                 checked={task.completedAt !== null}
@@ -490,53 +486,22 @@ export function TaskRow({
                 </button>
               )}
 
-              {task.tags.length > 0 ? (
-                <span className="hidden shrink-0 gap-1 sm:inline-flex">
-                  {task.tags.map((tag) => (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
-                      key={tag.id}
-                    >
-                      <span
-                        aria-hidden
-                        className="size-1.5 rounded-full"
-                        style={{ background: ENTITY_COLORS[tag.color] }}
-                      />
-                      {tag.name}
-                    </span>
-                  ))}
-                </span>
-              ) : null}
               {/* Распорка: индикаторы прижаты вправо, клик по ней открывает панель. */}
               <span aria-hidden className="min-w-0 flex-1" />
-              {task.pinned ? (
-                <PinIcon
-                  className="size-3.5 shrink-0 text-muted-foreground"
-                  aria-label="Закреплено"
-                />
-              ) : null}
-              {task.priority !== "none" ? (
-                <FlagIcon
-                  className={cn("size-3.5 shrink-0 fill-current", PRIORITY_CLASS[task.priority])}
-                  aria-label="Приоритет"
-                />
-              ) : null}
+              <TaskTagsChip task={task} onPatch={(input) => void patchTask(input)} />
+              <TaskPriorityChip task={task} onPatch={(input) => void patchTask(input)} />
               {task.rrule !== null ? (
                 <RepeatIcon
                   className="size-3.5 shrink-0 text-muted-foreground"
                   aria-label={rruleValueLabel(task.rrule)}
                 />
               ) : null}
-              {dueLabel ? (
-                <span
-                  className={cn(
-                    "shrink-0 text-xs",
-                    overdue ? "font-medium text-destructive" : "text-muted-foreground",
-                  )}
-                >
-                  {dueLabel}
-                </span>
-              ) : null}
+              <TaskDateChip
+                task={task}
+                overdue={overdue}
+                label={dueLabel}
+                onPatch={(input) => void patchTask(input)}
+              />
               {/* Счётчик-переключатель блока подзадач; пустой блок не показываем —
                   подзадачи добавляются Shift+Enter в правке названия. */}
               {task.subtasks.length > 0 ? (

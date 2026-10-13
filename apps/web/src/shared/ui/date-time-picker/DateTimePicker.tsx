@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { addDays, format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { XIcon } from "lucide-react";
 import * as React from "react";
@@ -27,11 +27,28 @@ interface DateTimePickerProps {
   showTime?: boolean;
   showDate?: boolean;
   timeStepMinutes?: number;
+  /**
+   * Календарь и время без кнопки-триггера и собственного поповера —
+   * для встраивания в чужой поповер (чип даты в строке задачи).
+   */
+  inline?: boolean;
 }
 
+interface QuickPreset {
+  label: string;
+  /** Смещение в днях от сегодня; null = очистить дату. */
+  dayOffset: number | null;
+}
+
+const QUICK_PRESETS: QuickPreset[] = [
+  { label: "Сегодня", dayOffset: 0 },
+  { label: "Завтра", dayOffset: 1 },
+  { label: "Следующая неделя", dayOffset: 7 },
+];
+
 /**
- * finnn → Plana (упрощён): без относительных пресетов; дата — календарь в
- * поповере, время — автокомплит. Время применяется только при выбранной дате.
+ * finnn → Plana (упрощён): дата — календарь в поповере с быстрыми пресетами,
+ * время — автокомплит. Время применяется только при выбранной дате.
  */
 export function DateTimePicker({
   date,
@@ -43,6 +60,7 @@ export function DateTimePicker({
   showTime = true,
   showDate = true,
   timeStepMinutes = 15,
+  inline = false,
 }: DateTimePickerProps) {
   const [open, setOpen] = React.useState(false);
   const [timeValue, setTimeValue] = React.useState(() => (date ? formatTimeValue(date) : "09:00"));
@@ -73,9 +91,23 @@ export function DateTimePicker({
   const handleDateSelect = (selectedDate: Date | undefined) => {
     if (selectedDate) {
       onSelect?.(applyCurrentTimeToDate(selectedDate));
-      setOpen(false);
+      if (!inline) {
+        setOpen(false);
+      }
     } else {
       onSelect?.(undefined);
+    }
+  };
+
+  /** Быстрый пресет: сегодня/завтра/+7 дней — с текущим выбранным временем. */
+  const handlePresetSelect = (preset: QuickPreset) => {
+    if (preset.dayOffset === null) {
+      onSelect?.(undefined);
+    } else {
+      onSelect?.(applyCurrentTimeToDate(addDays(new Date(), preset.dayOffset)));
+    }
+    if (!inline) {
+      setOpen(false);
     }
   };
 
@@ -110,6 +142,65 @@ export function DateTimePicker({
     }
   };
 
+  /** Общая «начинка»: пресеты + календарь; время — рядом (в inline внутри). */
+  const calendarBody = (
+    <>
+      <div className="flex flex-wrap gap-1 border-b border-border p-2">
+        {QUICK_PRESETS.map((preset) => (
+          <button
+            key={preset.label}
+            type="button"
+            className="cursor-pointer rounded-md bg-surface-subtle px-2 py-1 text-xs text-secondary-foreground transition-colors hover:bg-surface-hover"
+            onClick={() => handlePresetSelect(preset)}
+          >
+            {preset.label}
+          </button>
+        ))}
+        {clearable ? (
+          <button
+            type="button"
+            className="cursor-pointer rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
+            onClick={() => handlePresetSelect({ label: "", dayOffset: null })}
+          >
+            Без даты
+          </button>
+        ) : null}
+      </div>
+      <div className="p-2">
+        <Calendar
+          mode="single"
+          selected={date}
+          defaultMonth={date}
+          onSelect={handleDateSelect}
+          disabled={disabled}
+          locale={ru}
+          initialFocus={!inline}
+          captionLayout="dropdown"
+        />
+      </div>
+    </>
+  );
+
+  const timeInput = showTime ? (
+    <TimeAutocomplete
+      options={timeOptions}
+      value={timeValue}
+      onChange={handleTimeValueChange}
+      onFocus={() => setIsTimeInputFocused(true)}
+      onSelect={handleTimeSelect}
+      onBlur={handleTimeBlur}
+    />
+  ) : null;
+
+  if (inline) {
+    return (
+      <div className={cn("flex items-start gap-2", className)}>
+        <div className="flex flex-col">{calendarBody}</div>
+        {timeInput ? <div className="pt-2">{timeInput}</div> : null}
+      </div>
+    );
+  }
+
   return (
     <div className={cn("flex items-center gap-2", className)}>
       {showDate ? (
@@ -133,28 +224,10 @@ export function DateTimePicker({
             </Button>
           )}
         >
-          <Calendar
-            mode="single"
-            selected={date}
-            defaultMonth={date}
-            onSelect={handleDateSelect}
-            disabled={disabled}
-            locale={ru}
-            initialFocus
-            captionLayout="dropdown"
-          />
+          {calendarBody}
         </Popover>
       ) : null}
-      {showTime ? (
-        <TimeAutocomplete
-          options={timeOptions}
-          value={timeValue}
-          onChange={handleTimeValueChange}
-          onFocus={() => setIsTimeInputFocused(true)}
-          onSelect={handleTimeSelect}
-          onBlur={handleTimeBlur}
-        />
-      ) : null}
+      {showTime && !showDate ? timeInput : null}
       {clearable && date ? (
         <button
           type="button"

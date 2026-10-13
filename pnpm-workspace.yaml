@@ -6,3 +6,7 @@ allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
   - dotenv@18.0.7
+  - framer-motion@14.2.0
+  - motion-dom@14.2.0
+  - motion-utils@14.1.1
+  - motion@14.2.0

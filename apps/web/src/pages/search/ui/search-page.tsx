@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence } from "motion/react";
 import { SearchIcon } from "lucide-react";
 import { useSearchParams } from "react-router";
 import { todayInZone } from "@plana/shared";
@@ -81,15 +80,14 @@ export function SearchPage() {
         ) : null}
       </PageFade>
 
-      <AnimatePresence>
-        {detailsTask ? (
-          <TaskDetails
-            key={detailsTask.id}
-            task={detailsTask}
-            onClose={() => setDetailsTaskId(null)}
-          />
-        ) : null}
-      </AnimatePresence>
+      {/* Панель сама проигрывает закрытие и размонтируется (см. TaskDetails). */}
+      {detailsTask ? (
+        <TaskDetails
+          key={detailsTask.id}
+          task={detailsTask}
+          onClose={() => setDetailsTaskId(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { AnimatePresence } from "motion/react";
 import { addDays, todayInZone, type SmartListKey } from "@plana/shared";
 import { useTasksQuery, useUserTimezone } from "@/entities/task";
 import { QuickAdd } from "@/features/quick-add";
@@ -72,15 +71,14 @@ export function SmartPage({ smart }: SmartPageProps) {
         ) : null}
       </PageFade>
 
-      <AnimatePresence>
-        {detailsTask ? (
-          <TaskDetails
-            key={detailsTask.id}
-            task={detailsTask}
-            onClose={() => setDetailsTaskId(null)}
-          />
-        ) : null}
-      </AnimatePresence>
+      {/* Панель сама проигрывает закрытие и размонтируется (см. TaskDetails). */}
+      {detailsTask ? (
+        <TaskDetails
+          key={detailsTask.id}
+          task={detailsTask}
+          onClose={() => setDetailsTaskId(null)}
+        />
+      ) : null}
     </div>
   );
 }

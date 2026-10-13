@@ -16,7 +16,6 @@ import { useCompleteTask, useUncompleteTask, useUpdateTask } from "@/features/ta
 import { errorMessage } from "@/shared/lib/error-message";
 import {
   Button,
-  Checkbox,
   ColorDot,
   DateTimePicker,
   EntityMarker,
@@ -52,7 +51,6 @@ interface DetailsFormState {
   dueDate: string;
   dueTime: string;
   priority: TaskPriority;
-  pinned: boolean;
   listId: string;
   rrule: string;
   tagNames: string[];
@@ -65,7 +63,6 @@ function formFromTask(task: TaskDto): DetailsFormState {
     dueDate: task.dueDate ?? "",
     dueTime: task.dueTime?.slice(0, 5) ?? "",
     priority: task.priority,
-    pinned: task.pinned,
     listId: task.listId,
     rrule: task.rrule ?? "",
     tagNames: task.tags.map((tag) => tag.name),
@@ -94,7 +91,6 @@ function buildPatch(
     patch.dueTime = effectiveDueTime === "" ? null : effectiveDueTime;
   }
   if (form.priority !== task.priority) patch.priority = form.priority;
-  if (form.pinned !== task.pinned) patch.pinned = form.pinned;
   if (form.listId !== task.listId) {
     // Перенос в другой список сбрасывает секцию (секции принадлежат списку).
     patch.listId = form.listId;
@@ -141,6 +137,16 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
   const patchRef = useRef(patch);
   patchRef.current = patch;
 
+  // Внешние правки задачи (чипы в строке, другое устройство) подтягиваются
+  // в форму, когда локальных несохранённых правок нет — иначе автосейв
+  // панели откатил бы чужое изменение своими старыми значениями полей.
+  useEffect(() => {
+    if (patch === null) {
+      setForm(formFromTask(task));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task]);
+
   // Автосейв: тихий PATCH через паузу после последней правки.
   useEffect(() => {
     if (!patch) return;
@@ -161,6 +167,50 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  // Фаза закрытия: проигрываем уход и размонтируемся сами. AnimatePresence
+  // на странице списка не подходит: его exit в этой структуре иногда не
+  // удаляет элемент из DOM (панель навсегда остаётся с opacity:0 и ловит клики).
+  const [closing, setClosing] = useState(false);
+  const asideRef = useRef<HTMLElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  function requestClose() {
+    if (closing) return;
+    // Без фокуса окна rAF и таймеры замирают — анимацию закрытия не проиграть,
+    // закрываем сразу. Клик реального пользователя всегда даёт фокус.
+    if (prefersReducedMotion || !document.hasFocus()) {
+      onClose();
+      return;
+    }
+    setClosing(true);
+  }
+
+  // Страховка: размонтируем по таймеру, даже если событие завершения
+  // анимации не пришло (замороженный rAF в фоне, webview без кадров).
+  // onClose через ref: пересоздание колбэка ререндером не сбрасывает таймер.
+  useEffect(() => {
+    if (!closing) return;
+    const timer = setTimeout(() => onCloseRef.current(), 350);
+    return () => clearTimeout(timer);
+  }, [closing]);
+
+  // Клик/тап вне панели закрывает её. Поповеры и диалоги рендерятся
+  // в портале вне aside — их клики игнорируем, иначе закрывали бы панель.
+  useEffect(() => {
+    if (closing) return;
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (asideRef.current?.contains(target)) return;
+      if (target.closest('[data-slot="popover-content"], [role="dialog"]')) return;
+      requestClose();
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closing, prefersReducedMotion]);
 
   async function toggleComplete() {
     try {
@@ -218,12 +268,15 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
 
   return (
     <motion.aside
+      ref={asideRef}
       aria-label="Детали задачи"
       className="fixed top-0 right-0 z-40 flex h-dvh w-[340px] shrink-0 flex-col gap-4 overflow-y-auto rounded-l-xl border border-border bg-card p-4 shadow-lg max-md:inset-x-0 max-md:top-auto max-md:bottom-0 max-md:h-auto max-md:max-h-[80dvh] max-md:rounded-t-xl max-md:rounded-l-none max-md:border-t max-md:border-l-0"
       initial={prefersReducedMotion ? false : { opacity: 0, x: 16 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={prefersReducedMotion ? undefined : { opacity: 0, x: 16 }}
+      animate={closing ? { opacity: 0, x: 16 } : { opacity: 1, x: 0 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
+      onAnimationComplete={() => {
+        if (closing) onClose();
+      }}
     >
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">Задача</h2>
@@ -231,7 +284,7 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
           className="cursor-pointer rounded-full p-1 text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground"
           title="Закрыть"
           type="button"
-          onClick={onClose}
+          onClick={requestClose}
         >
           <XIcon className="size-5" />
         </button>
@@ -332,15 +385,6 @@ export function TaskDetails({ task, onClose }: TaskDetailsProps) {
           onCreate={(name) => toggleTag(name.trim())}
         />
       </div>
-
-      <label className="flex items-center gap-2 text-sm">
-        <Checkbox
-          checked={form.pinned}
-          onCheckedChange={(pinned) => setForm((state) => ({ ...state, pinned }))}
-          aria-label="Закреплено"
-        />
-        Закреплено
-      </label>
 
       {saveError ? <p className="text-sm text-destructive">{saveError}</p> : null}
 
