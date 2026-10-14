@@ -535,7 +535,7 @@ export function TaskRow({
                   подзадачи добавляются Shift+Enter в правке названия. */}
               {task.subtasks.length > 0 ? (
                 <button
-                  className="shrink-0 cursor-pointer rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+                  className="shrink-0 cursor-pointer rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground"
                   title="Подзадачи"
                   type="button"
                   onClick={(event) => {

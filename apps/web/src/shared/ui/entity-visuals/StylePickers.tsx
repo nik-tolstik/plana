@@ -166,7 +166,7 @@ export function EntityStylePopover({
         <button
           {...triggerProps}
           type="button"
-          className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+          className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground"
           title={title}
           aria-label={title}
         >

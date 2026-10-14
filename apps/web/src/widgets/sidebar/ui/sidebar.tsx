@@ -91,7 +91,7 @@ function SmartVisibilityButton({
         <button
           {...triggerProps}
           type="button"
-          className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+          className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground"
           title="Настройки умных списков"
           aria-label="Настройки умных списков"
         >
@@ -169,7 +169,7 @@ function HeaderIconButton({
       title={title}
       aria-label={title}
       onClick={onClick}
-      className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+      className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground"
     >
       {children}
     </button>

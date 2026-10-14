@@ -16,41 +16,49 @@
 | Календарь            | `react-day-picker` v9 + `date-fns` v4     | Calendar (locale ru), на токенах plana; часть DateTimePicker            |
 | Витрина              | `storybook` 10 (`@storybook/react-vite`)  | addon-docs + addon-a11y, тулбар темы light/dark                         |
 
-## Токены: три уровня
+## Токены: четыре слоя
 
-**1. Палитра** (`--palette-*`, в `:root`): сырые значения, в компонентах не используются.
+Каждый слой ссылается только на предыдущие; в компонентах выше `shared/ui` используются только слои 3–4 (утилити-классы). Источник — `apps/web/src/shared/styles/globals.css`.
 
-| Токен                 | Значение                    |
-| --------------------- | --------------------------- |
-| `neutral-25..900`     | #fff … #17171a (9 ступеней) |
-| `blue-600`            | `#2d69fd`                   |
-| `dark-700..900`       | oklch(0.3 … 0.19 0 0)       |
-| `dark-text-secondary` | oklch(0.708 0 0)            |
+**1. Палитра** (`--palette-*`, `:root`): самодостаточный набор сырых значений (hex/oklch), в компонентах не используются; дефолтная палитра Tailwind не подключается.
+
+| Токен                             | Значение                          |
+| --------------------------------- | --------------------------------- |
+| `neutral-50..900`                 | #fff … #17171a (7 ступеней)       |
+| `blue-600` / `blue-400`           | `#2d69fd` / `#60a5fa`             |
+| `orange-400`                      | `#fb923c`                         |
+| `green-400` / `green-700`         | `#4ade80` / `#15803d`             |
+| `red-400` / `red-500` / `red-600` | `#f87171` / `#ef4444` / `#dc2626` |
+| `dark-700..900`                   | oklch(0.3 … 0.19 0 0)             |
+| `dark-text-secondary`             | oklch(0.708 0 0)                  |
 
 `#2d69fd`, а не finnn-шный `#2f6bff`: белый текст на `#2f6bff` давал 4.49:1 (WCAG AA требует 4.5:1); `#2d69fd` даёт 4.61:1 при незаметной глазу разнице (2/255 на канал).
 
-**2. Семантические** (переопределяются темой, `:root, html.light` / `html.dark`):
+**2. База темы** (`:root, html.light` / `html.dark`) — единственное место различий тем: слои поверхностей `--surface-canvas/raised/inset/subtle/control/control-hover/hover/selected`, текст `--text-primary/secondary/accent`, `--border-default`, `--focus-ring`, статусные `--danger`/`--positive` со своими foreground, три компонентных исключения (`--dialog-background`, `--segmented-indicator`, `--option-selected`) и домен `--priority-low/medium/high`.
 
-| Токен                | light                    | dark                    | Контраст текста |
-| -------------------- | ------------------------ | ----------------------- | --------------- |
-| `--background`       | white                    | oklch(0.19 0 0)         | —               |
-| `--foreground`       | neutral-900              | white                   | 16.9 / 15.5     |
-| `--muted-foreground` | neutral-500              | dark-text-secondary     | 5.0 / 6.5       |
-| `--primary`          | `#2d69fd`                | `#2d69fd`               | 4.61 с белым    |
-| `--primary-text`     | blue-600 (4.61 на white) | blue-400 (7.25 на dark) | —               |
-| `--success`          | green-700 (5.02 с белым) | green-400               | 5.02 / 9.1      |
-| `--destructive`      | red-600 (4.83 с белым)   | red-400                 | 4.83 / 5.75     |
-| `--surface-raised`   | white                    | oklch(0.23 0 0)         | —               |
-| `--surface-control`  | neutral-125              | oklch(0.269 0 0)        | —               |
-| `--border`           | neutral-200              | oklch(1 0 0 / 0.1)      | —               |
+| Токен              | light                    | dark                    | Контраст текста |
+| ------------------ | ------------------------ | ----------------------- | --------------- |
+| `--surface-canvas` | white                    | oklch(0.19 0 0)         | —               |
+| `--text-primary`   | neutral-900              | white                   | 16.9 / 15.5     |
+| `--text-secondary` | neutral-500              | dark-text-secondary     | 5.0 / 6.5       |
+| `--text-accent`    | blue-600 (4.61 на white) | blue-400 (7.25 на dark) | —               |
+| `--danger`         | red-600 (4.83 с белым)   | red-400                 | 4.83 / 5.75     |
+| `--positive`       | green-700 (5.02 с белым) | green-400               | 5.02 / 9.1      |
+| `--border-default` | neutral-200              | oklch(1 0 0 / 10%)      | —               |
 
-Отдельные токены для «акцент как текст» (`--primary-text`) и «акцент как заливка» (`--primary`) существуют потому, что один синий не проходит AA в обеих ролях сразу: заливке с белым текстом нужен тёмный синий, тексту на тёмном фоне — светлый.
+Отдельный `--text-accent` существует потому, что один синий не проходит AA в обеих ролях сразу: заливке с белым текстом нужен тёмный синий (`--primary`), тексту на тёмном фоне — светлый.
 
-**3. Компонентные**: `--control-background`, `--control-hover`, `--control-focus`, `--segmented-*`, `--dialog-background`, `--popover-background`, `--option-*`.
+**3. Контракты** (`:root`, от темы не зависят, объявлены один раз): Tailwind-API алиасы (`--background → surface-canvas`, `--foreground → text-primary`, `--primary-text → text-accent`, `--destructive → danger`, `--success → positive`, …) и компонентные (`--popover-background`, `--control-background(-hover)`, `--control-focus/placeholder`, `--segmented-background/hover`, `--option-hover`). Смена темы меняет только базу — контракты не дублируются.
 
-**Домен-токены** (смысл Plana): `--priority-low/medium/high` (light: blue-400/orange-400/red-400, dark — те же).
+**4. `@theme inline`**: маппинг контрактов в утилити-классы (`bg-surface-*`, `bg-control(-hover)`, `text-primary-text`, `bg-priority-*`, …), радиусы `--radius-sm..xl` (4/6/8/10 px), шрифты.
 
 Сменные акценты: контракт `html[data-accent-color="blue|pink|green|orange|violet"]` → `--app-accent-color` готов, UI выбора — post-MVP.
+
+Договорённости по слоям поверхностей:
+
+- `bg-control` / `bg-control-hover` — интерактивные контролы: поля ввода и иконки-кнопки внутри строк.
+- `bg-surface-hover` / `bg-surface-selected` — крупные зоны: строки списков и меню, выделение активной страницы.
+- `bg-surface-subtle` — статичные подложки: чипы тегов, скелетон.
 
 ## Тема
 
@@ -62,20 +70,22 @@
 
 Везде `useReducedMotion()`: при prefers-reduced-motion паттерны отключаются (duration 0 / initial false).
 
-| Паттерн            | Параметры                                                                | Где                                 |
-| ------------------ | ------------------------------------------------------------------------ | ----------------------------------- |
-| Появление элемента | fade + rise: opacity 0→1, y 8→0, 250 ms easeOut                          | AnimatedListItem, PageFade, панели  |
-| Stagger списка     | шаг 40 ms, максимум 8 шагов (320 ms) — `staggerDelayMs(i)`               | группы задач, карточки привычек     |
-| Схлопывание блока  | height auto→0 + opacity, 180–200 ms easeOut                              | папки, группы задач, форма привычки |
-| Spring-галочка     | scale 0.3→1, spring stiffness 700 / damping 30; whileTap ×0.85           | Checkbox                            |
-| Переезд сегмента   | spring stiffness 500 / damping 40 по getBoundingClientRect               | Segmented                           |
-| Панель деталей     | slide-in x:16, вход и уход                                               | TaskDetails                         |
-| Диалог             | open 180 ms / close 120 ms, scale 0.96, transformOrigin bottom на mobile | Dialog (floating-ui)                |
-| Поповер            | open 180 ms / close 120 ms + scale 0.98, CSS через useTransitionStyles   | Popover, Select, ContextMenu        |
+| Паттерн              | Параметры                                                                  | Где                                 |
+| -------------------- | -------------------------------------------------------------------------- | ----------------------------------- |
+| Появление элемента   | fade + rise: opacity 0→1, y 8→0, 250 ms easeOut                            | AnimatedListItem, PageFade, панели  |
+| Stagger списка       | шаг 40 ms, максимум 8 шагов (320 ms) — `staggerDelayMs(i)`                 | группы задач, карточки привычек     |
+| Схлопывание блока    | height auto→0 + opacity, 180–220 ms easeOut                                | папки, группы задач, форма привычки |
+| Spring-галочка       | scale 0.3→1, spring stiffness 700 / damping 30; whileTap ×0.85             | Checkbox                            |
+| Переезд сегмента     | spring stiffness 500 / damping 40 по getBoundingClientRect                 | Segmented                           |
+| Переезд строки (DnD) | `layout` на вложенном motion.div, 220 ms easeOut                           | перестановка задач, строки сайдбара |
+| Завершение задачи    | check spring мгновенно → PATCH через 450 ms → height 0 + opacity, 220 ms   | TaskRow (completing-фаза)           |
+| Панель деталей       | slide-in x:16; уход — closing-фаза (animate → 0) + таймер-страховка 350 ms | TaskDetails                         |
+| Диалог               | open 180 ms / close 120 ms, scale 0.96, transformOrigin bottom на mobile   | Dialog (floating-ui)                |
+| Поповер              | open 180 ms / close 120 ms + scale 0.98, CSS через useTransitionStyles     | Popover, Select, ContextMenu        |
 
-Поповеры анимируются CSS-переходами `useTransitionStyles` (transform-origin от стороны размещения), а не motion: контент живёт в `FloatingPortal` и монтируется/размонтируется floating-ui, `AnimatePresence` туда не тянется.
+Поповеры анимируются CSS-переходами `useTransitionStyles` (transform-origin от стороны размещения), а не motion: контент живёт в `FloatingPortal` и монтируется/размонтируется floating-ui, `AnimatePresence` туда не тянётся.
 
-Правила: `AnimatePresence` обязателен для любых уходов (иначе exit-анимации не работают); для HTML5 drag&drop — обычный `<li>` с пропсами + вложенный `motion.div` (motion.li перехватывает onDragStart как свой жест).
+Правила: уходы вложенных списков — через `AnimatePresence` (exit-анимации); панель деталей — исключение: сама играет closing-фазу (`animate → {opacity:0, x:16}` + `onAnimationComplete`) с таймером-страховкой и мгновенным закрытием при `!document.hasFocus()` — в webview без фокуса rAF замирает и exit `AnimatePresence` не завершается никогда. Для HTML5 drag&drop — обычный `<li>` с пропсами + вложенный `motion.div` (motion.li перехватывает onDragStart как свой жест).
 
 ## Доступность (WCAG AA)
 
@@ -99,14 +109,14 @@
 
 Из finnn перенесены с ревью и упрощением под нужды Plana: `Popover` (база), `Select` (заменил нативный select), `Calendar` + `DateTimePicker` + `TimeAutocomplete` (заменили input type=date/time), `ContextMenu` (новый, в finnn его не было — собран из Popover с виртуальным якорем).
 
-| Компонент        | Ключевые решения                                                                                                                                                                                                                                                                                                  |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Popover          | Общий фундамент: useClick/useDismiss/useRole + flip/shift/size; `interaction: "click" \| "manual"` и внешний `reference` — для контекстного меню; middleware size ставит CSS-переменную `--popover-trigger-width` (дропдаун Select не шире триггера). Упрощено против finnn: без FloatingTree/overlay-portal-root |
-| Select           | API `options: {value, label}[]` вместо children-option; триггер Button field h-9 + ChevronDown (поворот на 180° при открытии); выбранный пункт — bg-option-selected + галочка text-primary-text; клик по пункту закрывает                                                                                         |
-| Calendar         | react-day-picker v9, captionLayout="dropdown" (месяц+год селектами), locale ru из date-fns; DayButton — ghost Button, выбранный день bg-primary, today/range — bg-option-selected                                                                                                                                 |
-| DateTimePicker   | Кнопка даты (variant field, формат dd.MM.yyyy) + TimeAutocomplete рядом; без relativeDatePresets/Segmented из finnn; время применяется только при существующей дате, дефолт при выборе дня — 09:00; clearable → крестик «Очистить дату»                                                                           |
-| TimeAutocomplete | Input role="combobox" поверх Popover-listbox: сетка 00:00–23:45 шаг 15 мин (96 опций), произвольное время валидируется `normalizeTimeInput` («9:05»→«09:05», «24:00»/«12:60» отклоняются)                                                                                                                         |
-| ContextMenu      | ПКМ по обёрнутому children (render-prop отдаёт onContextMenu); меню позиционируется в точке клика через виртуальный якорь `DOMRect(x, y, 0, 0)`; пункты role="menuitem", у delete — danger (text-destructive)                                                                                                     |
+| Компонент        | Ключевые решения                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Popover          | Общий фундамент: useClick/useDismiss/useRole + flip/shift/size; `interaction: "click" \| "manual"` и внешний `reference` — для контекстного меню; middleware size ставит CSS-переменную `--popover-trigger-width` (дропдаун Select не шире триггера). Упрощено против finnn: без FloatingTree/overlay-portal-root                                                                                                                                                                   |
+| Select           | API `options: {value, label}[]` вместо children-option; триггер Button field h-9 + ChevronDown (поворот на 180° при открытии); выбранный пункт — bg-option-selected + галочка text-primary-text; клик по пункту закрывает                                                                                                                                                                                                                                                           |
+| Calendar         | react-day-picker v9, captionLayout="dropdown" (месяц+год селектами), locale ru из date-fns; DayButton — ghost Button, выбранный день bg-primary, today/range — bg-option-selected                                                                                                                                                                                                                                                                                                   |
+| DateTimePicker   | Кнопка даты (variant field, формат dd.MM.yyyy) + TimeAutocomplete рядом. Над календарём — пресеты одной строкой (Сегодня/Завтра/Неделя/Без даты, flex-1, активный подсвечен `bg-primary/10 text-primary-text`; «Без даты» только при clearable). `inline`-режим — те же календарь и пресеты без триггера, для встраивания в чужой поповер (чип даты, quick-add). Время применяется только при существующей дате, дефолт при выборе дня — 09:00; clearable → крестик «Очистить дату» |
+| TimeAutocomplete | Input role="combobox" поверх Popover-listbox: сетка 00:00–23:45 шаг 15 мин (96 опций), произвольное время валидируется `normalizeTimeInput` («9:05»→«09:05», «24:00»/«12:60» отклоняются)                                                                                                                                                                                                                                                                                           |
+| ContextMenu      | ПКМ по обёрнутому children (render-prop отдаёт onContextMenu); меню позиционируется в точке клика через виртуальный якорь `DOMRect(x, y, 0, 0)`; пункты role="menuitem", у delete — danger (text-destructive)                                                                                                                                                                                                                                                                       |
 
 Удаление задач: кнопки ✕ в строке и «В корзину» в панели деталей убраны — в список и восстановление из корзины теперь через ПКМ («Завершить»/«Удалить», в корзине «Восстановить»).
 
@@ -124,10 +134,10 @@
 
 К задачам ревью добавлены два примитива в `shared/ui` и паттерны редактирования поверх них.
 
-| Примитив / паттерн | Ключевые решения                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| EntityVisuals      | `EntityMarker` — единый маркер сущности: иконка lucide, окрашенная `ENTITY_COLORS[color]`, либо `ColorDot` (кружок size-1.5) при `icon: null`. Неизвестный ключ иконки не роняет рендер — fallback ListIcon. `ENTITY_COLORS` — 9 hex, синхронизированы с `LIST_COLORS` из @plana/shared                                                                                                                                                                              |
-| EntityStylePopover | Поповер настроек сущности (карандаш): Input имени (коммит по blur/Enter, пустое — откат), сетка 9 цветов (role=radiogroup, выбранный — outline ring), сетка иконок grid-cols-7 с пунктом «Без иконки» (точка цвета), кнопка «Готово». Контент ремаунтится при открытии — state имени не рассинхронизируется                                                                                                                                                          |
-| MultiSelect        | Триггер-кнопка с чипами (leading-маркер + имя) + chevron; дропдаун Popover w-64: поиск (показывается при >8 опций или заданном onCreate), role=listbox aria-multiselectable, опции с Checkbox size sm + галочкой CheckIcon, пункт «Создать «X»» при непустом фильтре без точного совпадения (lower). Владелец данных должен дополнять options элементами локального состояния, которых нет в кэше запроса, — иначе созданная сущность не появится в чипах до рефетча |
-| Панель деталей     | `fixed` поверх контента (не flex-слот), автосейв diff→PATCH 600мс + flush на unmount, без «Сохранить»/алертов; ошибки — только isError мутации                                                                                                                                                                                                                                                                                                                       |
-| Инлайн-ввод задач  | Клик по тексту → textarea на месте; Enter — следующая задача, Shift+Enter — подзадача, Escape — отмена, blur — сохранить + открыть панель. Создание с `afterTaskId` держит строку ввода под только что созданной задачей                                                                                                                                                                                                                                             |
+| Примитив / паттерн | Ключевые решения                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EntityVisuals      | `EntityMarker` — единый маркер сущности: иконка lucide, окрашенная `ENTITY_COLORS[color]`, либо `ColorDot` (кружок size-1.5) при `icon: null`. Неизвестный ключ иконки не роняет рендер — fallback ListIcon. `ENTITY_COLORS` — 9 hex, синхронизированы с `LIST_COLORS` из @plana/shared                                                                                                                                                                                                                                |
+| EntityStylePopover | Поповер настроек сущности (карандаш): Input имени (коммит по blur/Enter, пустое — откат), сетка 9 цветов (role=radiogroup, выбранный — outline ring), сетка иконок grid-cols-7 с пунктом «Без иконки» (точка цвета), кнопка «Готово». Контент ремаунтится при открытии — state имени не рассинхронизируется                                                                                                                                                                                                            |
+| MultiSelect        | Триггер-кнопка с чипами (leading-маркер + имя) + chevron; дропдаун Popover w-64: поиск (показывается при >8 опций или заданном onCreate), role=listbox aria-multiselectable, опции — leading-маркер + имя + CheckIcon справа у выбранных (без чекбоксов: галочка уже справа), пункт «Создать «X»» при непустом фильтре без точного совпадения (lower). Владелец данных должен дополнять options элементами локального состояния, которых нет в кэше запроса, — иначе созданная сущность не появится в чипах до рефетча |
+| Панель деталей     | `fixed` поверх контента (не flex-слот), автосейв diff→PATCH 600мс + flush на unmount, без «Сохранить»/алертов; ошибки — только isError мутации                                                                                                                                                                                                                                                                                                                                                                         |
+| Инлайн-ввод задач  | Клик по тексту → textarea на месте; Enter — следующая задача, Shift+Enter — подзадача, Escape — отмена, blur — сохранить + открыть панель. Создание с `afterTaskId` держит строку ввода под только что созданной задачей                                                                                                                                                                                                                                                                                               |

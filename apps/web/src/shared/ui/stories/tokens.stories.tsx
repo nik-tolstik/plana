@@ -75,6 +75,7 @@ export const Обзор: StoryObj = {
         <div className="flex flex-col gap-2 rounded-lg bg-surface-raised border-border p-4">
           <p className="text-foreground">Обычный текст — foreground. Шрифт Onest Variable.</p>
           <p className="text-muted-foreground">Приглушённый текст — muted-foreground.</p>
+          <p className="text-primary-text">Акцент как текст — primary-text.</p>
           {TYPE_SCALE.map((step) => (
             <div key={step.label} className="flex items-baseline gap-4">
               <code className="w-32 shrink-0 text-xs text-muted-foreground">{step.label}</code>

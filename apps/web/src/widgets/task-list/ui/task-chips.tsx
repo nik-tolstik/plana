@@ -58,7 +58,7 @@ export function TaskTagsChip({ task, onPatch }: TaskChipProps) {
           type="button"
           data-task-chip
           aria-label="Изменить теги"
-          className="hidden shrink-0 cursor-pointer gap-1 rounded-md px-0.5 py-0.5 transition-colors hover:bg-surface-control-hover sm:inline-flex"
+          className="hidden shrink-0 cursor-pointer gap-1 rounded-md px-0.5 py-0.5 transition-colors hover:bg-control-hover sm:inline-flex"
           onClick={(event) => {
             event.stopPropagation();
             onClick?.(event);
@@ -164,7 +164,7 @@ export function TaskDateChip({
           aria-label="Изменить дату"
           title="Изменить дату"
           className={cn(
-            "shrink-0 cursor-pointer rounded-md px-1 py-0.5 text-xs transition-colors hover:bg-surface-control-hover hover:text-foreground",
+            "shrink-0 cursor-pointer rounded-md px-1 py-0.5 text-xs transition-colors hover:bg-control-hover hover:text-foreground",
             overdue ? "font-medium text-destructive" : "text-muted-foreground",
           )}
           onClick={(event) => {
@@ -196,7 +196,7 @@ export function TaskPriorityChip({ task, onPatch }: TaskChipProps) {
           data-task-chip
           aria-label="Изменить приоритет"
           title={TASK_PRIORITY_LABELS_RU[task.priority]}
-          className="shrink-0 cursor-pointer rounded-md p-1 transition-colors hover:bg-surface-control-hover"
+          className="shrink-0 cursor-pointer rounded-md p-1 transition-colors hover:bg-control-hover"
           onClick={(event) => {
             event.stopPropagation();
             onClick?.(event);

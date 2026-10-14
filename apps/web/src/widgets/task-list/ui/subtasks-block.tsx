@@ -69,7 +69,7 @@ export function SubtasksBlock({ task }: SubtasksBlockProps) {
             </span>
             <span className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover/subtask:opacity-100 focus-within:opacity-100">
               <button
-                className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+                className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground"
                 title="Сделать отдельной задачей"
                 type="button"
                 onClick={() => void promote(subtask.id)}
@@ -77,7 +77,7 @@ export function SubtasksBlock({ task }: SubtasksBlockProps) {
                 <CornerUpRightIcon className="size-3" />
               </button>
               <button
-                className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+                className="cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground"
                 title="Удалить"
                 type="button"
                 onClick={() => void remove(subtask.id)}

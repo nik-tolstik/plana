@@ -115,7 +115,7 @@ export function ListRow({ list, onError, dnd, taskDrop }: ListRowProps) {
             onChange={(patch) => void applyStyle(patch)}
           />
           <button
-            className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+            className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground"
             type="button"
             title="Удалить"
             onClick={() => setConfirming(true)}

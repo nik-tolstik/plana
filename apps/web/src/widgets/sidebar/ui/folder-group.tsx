@@ -106,7 +106,7 @@ export function FolderGroup({ folder, onError, dndFor, taskDropFor, folderDnd }:
             </button>
             <span className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
               <button
-                className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+                className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground"
                 type="button"
                 title="Добавить проект в папку"
                 onClick={() => {
@@ -117,7 +117,7 @@ export function FolderGroup({ folder, onError, dndFor, taskDropFor, folderDnd }:
                 <PlusIcon className="size-3.5" />
               </button>
               <button
-                className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+                className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground"
                 type="button"
                 title="Переименовать папку"
                 onClick={() => setEditing(true)}
@@ -125,7 +125,7 @@ export function FolderGroup({ folder, onError, dndFor, taskDropFor, folderDnd }:
                 <SettingsIcon className="size-3.5" />
               </button>
               <button
-                className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+                className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground"
                 type="button"
                 title="Удалить папку"
                 onClick={() => setConfirming(true)}

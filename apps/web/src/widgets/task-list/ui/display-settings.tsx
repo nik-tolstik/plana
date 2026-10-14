@@ -55,7 +55,7 @@ export function ListDisplaySettingsButton({
           type="button"
           title="Группировка и сортировка"
           aria-label="Группировка и сортировка"
-          className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground"
+          className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground"
         >
           <ArrowUpDownIcon className="size-4" />
         </button>

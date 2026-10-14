@@ -99,7 +99,7 @@ export function HabitsList({ habits, today }: HabitsListProps) {
                         {habit.name}
                       </span>
                       <button
-                        className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-foreground disabled:opacity-50"
+                        className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground disabled:opacity-50"
                         disabled={update.isPending}
                         title="Восстановить"
                         type="button"
@@ -110,7 +110,7 @@ export function HabitsList({ habits, today }: HabitsListProps) {
                         <RotateCcwIcon className="size-4" />
                       </button>
                       <button
-                        className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-control-hover hover:text-destructive disabled:opacity-50"
+                        className="cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-control-hover hover:text-destructive disabled:opacity-50"
                         disabled={remove.isPending}
                         title="Удалить навсегда"
                         type="button"
