@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { TaskDto, TaskListDto } from "@plana/shared";
 import { taskKeys } from "@/entities/task";
 import { tagKeys } from "@/entities/tag";
 import { playCompletionSound } from "@/shared/lib/completion-sound";
@@ -39,11 +40,49 @@ export function useCreateTask() {
   });
 }
 
+/** Скалярные поля, безопасные для оптимистичного патча кэша. */
+type OptimisticTaskPatch = Partial<
+  Pick<TaskDto, "title" | "description" | "priority" | "dueDate" | "listId" | "sectionId">
+>;
+
 export function useUpdateTask() {
   const invalidate = useInvalidateTasksAndTags();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ taskId, ...input }: { taskId: string } & Parameters<typeof apiUpdateTask>[1]) =>
       apiUpdateTask(taskId, input),
+    // Скалярные поля применяем сразу в кэше: без этого blur инлайн-правки
+    // названия успевает показать старое значение до ответа сервера.
+    onMutate: async ({ taskId, ...input }) => {
+      const optimistic: OptimisticTaskPatch = {};
+      if (input.title !== undefined) optimistic.title = input.title;
+      if (input.description !== undefined) optimistic.description = input.description;
+      if (input.priority !== undefined) optimistic.priority = input.priority;
+      if (input.dueDate !== undefined) optimistic.dueDate = input.dueDate;
+      if (input.listId !== undefined) optimistic.listId = input.listId;
+      if (input.sectionId !== undefined) optimistic.sectionId = input.sectionId;
+      if (Object.keys(optimistic).length === 0) return {};
+      await queryClient.cancelQueries({ queryKey: taskKeys.all });
+      const snapshots: Array<[readonly unknown[], TaskListDto]> = queryClient
+        .getQueriesData<TaskListDto>({ queryKey: taskKeys.all })
+        .filter((entry): entry is [readonly unknown[], TaskListDto] => entry[1] !== undefined);
+      for (const [key, data] of snapshots) {
+        let patched = false;
+        const items = data.items.map((task) => {
+          if (task.id !== taskId) return task;
+          patched = true;
+          return { ...task, ...optimistic };
+        });
+        if (!patched) continue;
+        queryClient.setQueryData<TaskListDto>(key, { ...data, items });
+      }
+      return { snapshots };
+    },
+    onError: (_error, _variables, context) => {
+      for (const [key, data] of context?.snapshots ?? []) {
+        queryClient.setQueryData(key, data);
+      }
+    },
     onSuccess: invalidate,
   });
 }

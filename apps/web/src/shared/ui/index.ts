@@ -18,3 +18,4 @@ export * from "./select/index.js";
 export * from "./skeleton/index.js";
 export * from "./textarea/index.js";
 export * from "./page-fade/index.js";
+export * from "./tooltip/index.js";

@@ -19,11 +19,11 @@ import { useSidebarQuery } from "@/entities/list";
 import { useTagsQuery } from "@/entities/tag";
 import { useSessionStore } from "@/entities/user";
 import { logout } from "@/features/auth";
-import { useUpdateTask } from "@/features/task-manage";
+import { usePromoteSubtask, useUpdateTask } from "@/features/task-manage";
 import { useUpdateList } from "@/features/structure-manage";
 import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
-import { TASK_DRAG_MIME } from "@/shared/lib/task-drag-mime";
+import { SUBTASK_DRAG_MIME, TASK_DRAG_MIME, decodeSubtaskDrag } from "@/shared/lib/task-drag-mime";
 import { Checkbox, Popover } from "@/shared/ui";
 import { CreateEntityDialog, type CreateEntityKind } from "./create-entity-dialog";
 import { FolderGroup } from "./folder-group";
@@ -282,6 +282,7 @@ export function Sidebar() {
 
   // Дроп перетащенной задачи на строку списка — перенос задачи в этот список.
   const updateTask = useUpdateTask();
+  const promoteSubtask = usePromoteSubtask();
   const [taskOverListId, setTaskOverListId] = useState<string | null>(null);
 
   const sidebar = sidebarQuery.data;
@@ -442,11 +443,12 @@ export function Sidebar() {
     },
   });
 
-  /** Приём дропа задачи на строку списка (включая Inbox). */
+  /** Приём дропа задачи или подзадачи на строку списка (включая Inbox). */
   const taskDropFor = (list: ListDto) => ({
     over: taskOverListId === list.id,
     onDragOver: (event: React.DragEvent) => {
-      if (!event.dataTransfer.types.includes(TASK_DRAG_MIME)) return;
+      const types = event.dataTransfer.types;
+      if (!types.includes(TASK_DRAG_MIME) && !types.includes(SUBTASK_DRAG_MIME)) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = "move";
       setTaskOverListId(list.id);
@@ -454,8 +456,20 @@ export function Sidebar() {
     onDragLeave: () => setTaskOverListId((current) => (current === list.id ? null : current)),
     onDrop: (event: React.DragEvent) => {
       event.preventDefault();
-      const taskId = event.dataTransfer.getData(TASK_DRAG_MIME);
       setTaskOverListId(null);
+      // Подзадача: сначала отдельная задача (promote), затем перенос в список.
+      if (event.dataTransfer.types.includes(SUBTASK_DRAG_MIME)) {
+        const payload = decodeSubtaskDrag(event.dataTransfer.getData(SUBTASK_DRAG_MIME));
+        if (!payload) return;
+        promoteSubtask
+          .mutateAsync(payload.subtaskId)
+          .then((created) =>
+            updateTask.mutateAsync({ taskId: created.id, listId: list.id, sectionId: null }),
+          )
+          .catch((cause) => setError(errorMessage(cause)));
+        return;
+      }
+      const taskId = event.dataTransfer.getData(TASK_DRAG_MIME);
       if (!taskId) return;
       // Сервер ставит задачу в конец целевого списка (position не задан).
       updateTask

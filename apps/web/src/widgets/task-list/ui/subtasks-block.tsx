@@ -4,6 +4,7 @@ import type { TaskDto } from "@plana/shared";
 import { useDeleteSubtask, usePromoteSubtask, useUpdateSubtask } from "@/features/task-manage";
 import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
+import { SUBTASK_DRAG_MIME, encodeSubtaskDrag } from "@/shared/lib/task-drag-mime";
 import { Checkbox } from "@/shared/ui";
 
 interface SubtasksBlockProps {
@@ -13,9 +14,12 @@ interface SubtasksBlockProps {
 /**
  * Чеклист подзадач: отметить, вынести в отдельную задачу, удалить.
  * Новые подзадачи добавляются Shift+Enter в инлайн-режиме названия задачи.
+ * Строка подзадачи перетаскивается наружу (SUBTASK_DRAG_MIME): дроп на
+ * строку задачи / список в сайдбаре выносит её из родителя.
  */
 export function SubtasksBlock({ task }: SubtasksBlockProps) {
   const [error, setError] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
   const updateSubtask = useUpdateSubtask();
   const deleteSubtask = useDeleteSubtask();
   const promoteSubtask = usePromoteSubtask();
@@ -50,8 +54,25 @@ export function SubtasksBlock({ task }: SubtasksBlockProps) {
       <ul className="flex flex-col gap-0.5">
         {task.subtasks.map((subtask) => (
           <li
-            className="group/subtask flex items-center gap-2 rounded-md px-2 py-1"
+            className={cn(
+              "group/subtask flex items-center gap-2 rounded-md px-2 py-1",
+              draggingId === subtask.id && "opacity-40",
+            )}
             key={subtask.id}
+            draggable
+            onDragStart={(event) => {
+              // Не даём строке родительской задачи перезаписать dataTransfer.
+              event.stopPropagation();
+              setDraggingId(subtask.id);
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData(
+                SUBTASK_DRAG_MIME,
+                encodeSubtaskDrag({ subtaskId: subtask.id, parentTaskId: task.id }),
+              );
+              // Для Firefox обязателен text/plain; содержимое не используется.
+              event.dataTransfer.setData("text/plain", subtask.title);
+            }}
+            onDragEnd={() => setDraggingId(null)}
           >
             <Checkbox
               size="sm"

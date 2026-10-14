@@ -5,7 +5,7 @@ import type { ListDto, PatchListDto } from "@plana/shared";
 import { useTrashList, useUpdateList } from "@/features/structure-manage";
 import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
-import { TASK_DRAG_MIME } from "@/shared/lib/task-drag-mime";
+import { SUBTASK_DRAG_MIME, TASK_DRAG_MIME } from "@/shared/lib/task-drag-mime";
 import { ConfirmDeleteDialog, EntityMarker, EntityStylePopover } from "@/shared/ui";
 
 export interface ListRowDndProps {
@@ -64,11 +64,14 @@ export function ListRow({ list, onError, dnd, taskDrop }: ListRowProps) {
     }
   };
   const combinedDrop = (event: React.DragEvent) => {
-    if (event.dataTransfer.types.includes(TASK_DRAG_MIME)) {
+    const types = event.dataTransfer.types;
+    // Задача или подзадача — в приёмник задач; строки без списочного dnd
+    // (Inbox) тоже отдают любой дроп ему — внутренние guard-ы отфильтруют.
+    if (types.includes(TASK_DRAG_MIME) || types.includes(SUBTASK_DRAG_MIME) || dnd === undefined) {
       taskDrop?.onDrop(event);
       return;
     }
-    dnd?.onDrop(event);
+    dnd.onDrop(event);
   };
 
   return (

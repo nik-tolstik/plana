@@ -1,11 +1,12 @@
 import { addDays, format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { XIcon } from "lucide-react";
+import { CalendarXIcon, SunIcon, SunriseIcon, XIcon } from "lucide-react";
 import * as React from "react";
 
 import { Button } from "@/shared/ui/button";
 import { Calendar } from "@/shared/ui/calendar";
 import { Popover } from "@/shared/ui/popover";
+import { Tooltip } from "@/shared/ui/tooltip";
 import { cn } from "@/shared/lib/cn";
 
 import { TimeAutocomplete } from "./TimeAutocomplete";
@@ -36,15 +37,15 @@ interface DateTimePickerProps {
 
 interface QuickPreset {
   label: string;
+  icon: typeof SunIcon;
   /** Смещение в днях от сегодня; null = очистить дату. */
   dayOffset: number | null;
 }
 
 const QUICK_PRESETS: QuickPreset[] = [
-  { label: "Сегодня", dayOffset: 0 },
-  { label: "Завтра", dayOffset: 1 },
-  { label: "Неделя", dayOffset: 7 },
-  { label: "Без даты", dayOffset: null },
+  { label: "Сегодня", icon: SunIcon, dayOffset: 0 },
+  { label: "Завтра", icon: SunriseIcon, dayOffset: 1 },
+  { label: "Без даты", icon: CalendarXIcon, dayOffset: null },
 ];
 
 /** Выбран ли пресет сейчас (дата совпадает с его днём). */
@@ -160,24 +161,27 @@ export function DateTimePicker({
   /** Общая «начинка»: пресеты одной строкой + календарь; время — рядом (в inline внутри). */
   const calendarBody = (
     <>
-      <div className="flex gap-1 p-2 pb-0">
+      <div className="flex gap-1 p-2 pb-1">
         {QUICK_PRESETS.filter((preset) => clearable || preset.dayOffset !== null).map((preset) => {
           const active = presetActive(preset, date);
+          const PresetIcon = preset.icon;
           return (
-            <button
-              key={preset.label}
-              type="button"
-              aria-pressed={active}
-              className={cn(
-                "min-w-0 flex-1 cursor-pointer truncate rounded-md px-2 py-1.5 text-xs transition-colors",
-                active
-                  ? "bg-primary/10 font-medium text-primary-text"
-                  : "text-secondary-foreground hover:bg-surface-hover",
-              )}
-              onClick={() => handlePresetSelect(preset)}
-            >
-              {preset.label}
-            </button>
+            <Tooltip key={preset.label} label={preset.label}>
+              <button
+                type="button"
+                aria-label={preset.label}
+                aria-pressed={active}
+                className={cn(
+                  "flex h-8 flex-1 cursor-pointer items-center justify-center rounded-md transition-colors",
+                  active
+                    ? "bg-primary/10 text-primary-text"
+                    : "text-secondary-foreground hover:bg-surface-hover",
+                )}
+                onClick={() => handlePresetSelect(preset)}
+              >
+                <PresetIcon className="size-4" />
+              </button>
+            </Tooltip>
           );
         })}
       </div>

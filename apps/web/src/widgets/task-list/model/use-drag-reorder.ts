@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { TaskDto } from "@plana/shared";
-import { useNestTask, useUpdateTask } from "@/features/task-manage";
-import { TASK_DRAG_MIME } from "@/shared/lib/task-drag-mime";
+import { useNestTask, usePromoteSubtask, useUpdateTask } from "@/features/task-manage";
+import { SUBTASK_DRAG_MIME, TASK_DRAG_MIME, decodeSubtaskDrag } from "@/shared/lib/task-drag-mime";
 
 export { TASK_DRAG_MIME } from "@/shared/lib/task-drag-mime";
 
@@ -34,8 +34,9 @@ function zoneOf(event: React.DragEvent): DropZone {
 /**
  * Drag&drop задач на страницах списков: верхняя/нижняя зона строки ставит
  * задачу перед/после цели (position = индекс в контейнере без перетаскиваемой),
- * центральная — вкладывает задачу подзадачей цели (nest). Задачи передаются
- * в порядке отображения.
+ * центральная — вкладывает задачу подзадачей цели (nest). Дроп подзадачи
+ * сначала выносит её в отдельную задачу (promote), затем та же семантика зон.
+ * Задачи передаются в порядке отображения.
  */
 export function useTaskDragReorder(options: {
   enabled: boolean;
@@ -45,6 +46,7 @@ export function useTaskDragReorder(options: {
   const [state, setState] = useState<DragState>({ draggingId: null, over: null });
   const update = useUpdateTask();
   const nest = useNestTask();
+  const promote = usePromoteSubtask();
 
   const { enabled, tasks } = options;
 
@@ -63,6 +65,8 @@ export function useTaskDragReorder(options: {
         event.dataTransfer.setData("text/plain", task.id);
       },
       onDragOver(task, event) {
+        const types = event.dataTransfer.types;
+        if (!types.includes(TASK_DRAG_MIME) && !types.includes(SUBTASK_DRAG_MIME)) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
         const zone = zoneOf(event);
@@ -79,6 +83,42 @@ export function useTaskDragReorder(options: {
         const draggingId = state.draggingId;
         const zone = zoneOf(event);
         setState({ draggingId: null, over: null });
+
+        // Дроп подзадачи: сначала выносим её в отдельную задачу (promote),
+        // затем ставим относительно цели или вкладываем в неё.
+        if (event.dataTransfer.types.includes(SUBTASK_DRAG_MIME)) {
+          const payload = decodeSubtaskDrag(event.dataTransfer.getData(SUBTASK_DRAG_MIME));
+          if (!payload) return;
+          if (zone === "inside") {
+            // В собственного родителя уже вложена — игнорируем.
+            if (target.id === payload.parentTaskId) return;
+            promote
+              .mutateAsync(payload.subtaskId)
+              .then((created) => nest.mutateAsync({ taskId: created.id, parentTaskId: target.id }))
+              .catch(() => undefined);
+            return;
+          }
+          const container = tasks.filter(
+            (task) =>
+              task.listId === target.listId &&
+              (task.sectionId ?? null) === (target.sectionId ?? null),
+          );
+          const index = container.findIndex((task) => task.id === target.id);
+          if (index === -1) return;
+          promote
+            .mutateAsync(payload.subtaskId)
+            .then((created) =>
+              update.mutateAsync({
+                taskId: created.id,
+                listId: target.listId,
+                sectionId: target.sectionId,
+                position: zone === "after" ? index + 1 : index,
+              }),
+            )
+            .catch(() => undefined);
+          return;
+        }
+
         if (draggingId === null || draggingId === target.id) {
           return;
         }
@@ -112,5 +152,5 @@ export function useTaskDragReorder(options: {
         setState({ draggingId: null, over: null });
       },
     };
-  }, [enabled, state, tasks, update, nest]);
+  }, [enabled, state, tasks, update, nest, promote]);
 }

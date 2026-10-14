@@ -74,12 +74,12 @@ function Calendar({
           defaultClassNames.caption_label,
         ),
         table: "w-full border-collapse",
-        weekdays: cn("flex", defaultClassNames.weekdays),
+        weekdays: cn("flex gap-2", defaultClassNames.weekdays),
         weekday: cn(
           "flex-1 select-none rounded-md text-[0.8rem] font-normal text-muted-foreground",
           defaultClassNames.weekday,
         ),
-        week: cn("mt-2 flex w-full", defaultClassNames.week),
+        week: cn("mt-2 flex w-full gap-2", defaultClassNames.week),
         day: cn(
           "relative aspect-square w-full p-0 text-center select-none [&:last-child[data-selected=true]_button]:rounded-r-md",
           "[&:first-child[data-selected=true]_button]:rounded-l-md",
