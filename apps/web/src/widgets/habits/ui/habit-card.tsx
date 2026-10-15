@@ -1,7 +1,8 @@
 import { ArchiveIcon, FlameIcon, MinusIcon, PlusIcon } from "lucide-react";
-import { habitScheduleLabel, habitStreaks, type HabitWithEntriesDto } from "@plana/shared";
+import { habitStreaks, type HabitWithEntriesDto } from "@plana/shared";
 import { useDeleteHabitEntry, useSetHabitEntry, useUpdateHabit } from "@/features/habit-manage";
 import { cn } from "@/shared/lib/cn";
+import { habitScheduleLabel } from "@/shared/lib/habit-label";
 import { Button, Checkbox } from "@/shared/ui";
 import { HabitCalendar } from "./habit-calendar";
 import { ENTITY_COLORS } from "@/shared/ui";

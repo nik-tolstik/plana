@@ -81,7 +81,6 @@ function CompletionSoundSettings() {
 
 export function SettingsPage() {
   const user = useSessionStore((state) => state.user);
-  const setUser = useSessionStore((state) => state.setUser);
 
   const rows: Array<[string, string | undefined]> = [
     ["Имя", user?.name],
@@ -101,7 +100,7 @@ export function SettingsPage() {
         ))}
       </dl>
       <h2 className="mb-2 text-base font-semibold">Тема оформления</h2>
-      <ThemeSwitch onUserUpdated={setUser} />
+      <ThemeSwitch />
       <h2 className="mb-2 mt-6 text-base font-semibold">Звук</h2>
       <CompletionSoundSettings />
     </PageFade>

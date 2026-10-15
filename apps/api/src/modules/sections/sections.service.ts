@@ -1,10 +1,11 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { PatchSectionDto, SectionDto } from "@plana/shared";
-import { and, asc, eq, isNull, ne } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
+import { insertAtPosition } from "../../common/positioning";
 import { DB } from "../../db/database.module";
 import type { Db } from "../../db/drizzle";
 import { lists, sections } from "../../db/schema";
-import { POSITION_STEP, toSectionDto } from "../lists/lists.service";
+import { toSectionDto } from "../lists/lists.service";
 
 @Injectable()
 export class SectionsService {
@@ -38,24 +39,13 @@ export class SectionsService {
 
     const requestedPosition = dto.position;
     return this.db.transaction(async (tx) => {
-      const siblings = await tx
-        .select({ id: sections.id, position: sections.position })
-        .from(sections)
-        .where(and(eq(sections.listId, section.listId), ne(sections.id, sectionId)))
-        .orderBy(asc(sections.position), asc(sections.createdAt));
-
-      const index =
-        requestedPosition === undefined
-          ? siblings.length
-          : Math.min(requestedPosition, siblings.length);
-      siblings.splice(index, 0, { id: sectionId, position: -1 });
-      for (const [i, sibling] of siblings.entries()) {
-        const position = i * POSITION_STEP;
-        if (sibling.position !== position) {
-          await tx.update(sections).set({ position }).where(eq(sections.id, sibling.id));
-        }
-      }
-
+      await insertAtPosition(
+        tx,
+        sections,
+        eq(sections.listId, section.listId),
+        sectionId,
+        requestedPosition,
+      );
       const [updated] = await tx
         .update(sections)
         .set({ name: dto.name ?? section.name, updatedAt: new Date() })

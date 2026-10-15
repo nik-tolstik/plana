@@ -9,11 +9,11 @@
 | Слой       | Назначение                                                 | Наши слайсы                                                                                                                         |
 | ---------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `app`      | Инициализация: провайдеры, роутинг, глобальные стили,(env) | — (без слайсов)                                                                                                                     |
-| `pages`    | Страницы роутинга                                          | `home` (задачи), `habits`, `settings`, `login`                                                                                      |
-| `widgets`  | Крупные самостоятельные блоки страницы                     | `task-list-panel`, `task-details-panel`, `sidebar`, `habit-calendar`, `quick-add`                                                   |
-| `features` | Пользовательские действия (обычно одно на слайс)           | `auth`, `task-create`, `task-complete`, `task-edit`, `parse-date-input`, `push-subscribe`, `theme-switch`, `file-upload`            |
-| `entities` | Бизнес-сущности: их типы, API-запросы, UI-компоненты       | `task`, `subtask`, `list`, `folder`, `section`, `tag`, `habit`, `attachment`, `user`, `reminder`                                    |
-| `shared`   | Переиспользуемая инфраструктура без бизнес-логики          | `api` (клиент), `ui` (примитивы дизайн-системы), `lib` (утилиты, `cn`), `config` (env, константы), `styles` (Tailwind, токены темы) |
+| `pages`    | Страницы роутинга                                          | `home`, `list`, `smart`, `search`, `tag`, `habits`, `settings`, `login`                                                             |
+| `widgets`  | Крупные самостоятельные блоки страницы                     | `sidebar`, `task-list`, `task-details`, `habits`, `system-status`                                                                   |
+| `features` | Пользовательские действия (обычно одно на слайс)           | `auth`, `quick-add`, `task-manage`, `structure-manage`, `tag-manage`, `habit-manage`, `theme-switch`                                |
+| `entities` | Бизнес-сущности: их типы, API-запросы, UI-компоненты       | `task`, `list`, `folder`, `tag`, `habit`, `user`                                                                                    |
+| `shared`   | Переиспользуемая инфраструктура без бизнес-логики          | `api` (клиент), `ui` (примитивы дизайн-системы), `lib` (утилиты, `cn`, queryClient), `config` (env, константы), `styles` (Tailwind) |
 
 ## Слайсы и сегменты
 
@@ -26,11 +26,11 @@
 
 ## Правила для нашего стека
 
-- **TanStack Query**: хуки запросов живут в `entities/*/api` и `features/*/api`. Query-ключи — фабрики в `entities/*/model/keys.ts` (`taskKeys.list(filters)`, `taskKeys.detail(id)`). Мутации, меняющие задачи, инвалидируют через эти ключи.
+- **TanStack Query**: хуки запросов живут в `entities/*/api` и `features/*/api`. Query-ключи — фабрики в `entities/*/model/keys.ts` (`taskKeys.list(filters)`, `taskKeys.detail(id)`). Мутации, меняющие задачи, инвалидируют через эти ключи. Единственный `QueryClient` — синглтон в `shared/lib/query-client.ts` (не в провайдере): кэш чистится из не-React кода при logout и окончательной потере сессии.
 - **Zod**: контракты и enum'ы — в `@plana/shared`, не дублируются в `entities`. `entities/task/model/types.ts` только расширяет их клиентскими типами.
 - **Роутинг**: react-router, дерево маршрутов в `app/routes`. Страницы не знают друг о друге.
 - **Стили**: Tailwind CSS 4 (`@tailwindcss/postcss`, токены через `@theme inline` в `shared/styles/globals.css`) + дизайн-токены по `docs/design/design-system.md`. Примитивы (Button, Input, Checkbox, Segmented, Dialog, …) — в `shared/ui`; компоненты выше используют только их, а не голые элементы с классами. Radix/Base UI нет — примитивы свои (Checkbox/Segmented на motion, Dialog на floating-ui).
-- **Анимации**: `motion` ^12 (импорт `motion/react`). Паттерны и параметры (fade+rise, stagger, spring-галочка, collapse) — в `docs/design/design-system.md`; везде `useReducedMotion`. `AnimatePresence` обязателен для уходов.
+- **Анимации**: `motion` ^14 (импорт `motion/react`). Паттерны и параметры (fade+rise, stagger, spring-галочка, collapse) — в `docs/design/design-system.md`; везде `useReducedMotion`. `AnimatePresence` обязателен для уходов.
 - **Витрина**: Storybook 10 (`pnpm --filter web storybook`, стори в `shared/ui/stories`), тулбар темы light/dark, addon-a11y.
 - **Шрифт**: Onest Variable (`@fontsource-variable/onest`).
 - **Тема (system/light/dark)**: переключатель — `features/theme-switch`, применение — класс на `<html>` + CSS-переменные в `shared/styles`; выбор хранится в профиле (при синхронизации) и localStorage (до загрузки профиля, чтобы не мигало).
@@ -40,15 +40,15 @@
 
 Автопроверка импортов FSD линтером в MVP не подключена (oxlint не имеет готового плагина layers). Правила соблюдаются ревью и простым скриптом проверки алиасов (добавим при необходимости). Нарушение правил импортов — ошибка, а не стилистическое замечание.
 
-## Каркас каталога (уже создан в скелете)
+## Каркас каталога
 
 ```
 apps/web/src/
   app/          providers/, routes/
-  pages/        home/, habits/, settings/, login/
-  widgets/      (заполняется при реализации UI)
-  features/     (заполняется при реализации)
-  entities/     task/, list/, ... (api+model заготовки)
+  pages/        home/, list/, smart/, search/, tag/, habits/, settings/, login/
+  widgets/      sidebar/, task-list/, task-details/, habits/, system-status/
+  features/     auth/, quick-add/, task-manage/, structure-manage/, tag-manage/, habit-manage/, theme-switch/
+  entities/     task/, list/, folder/, tag/, habit/, user/
   shared/       api/, ui/, lib/, config/, styles/
   main.tsx
 ```

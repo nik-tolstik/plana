@@ -1,19 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { XIcon } from "lucide-react";
-import {
-  TASK_PRIORITIES,
-  TASK_PRIORITY_LABELS_RU,
-  rruleValueLabel,
-  todayInZone,
-  type TaskDto,
-  type TaskPriority,
-} from "@plana/shared";
+import { TASK_PRIORITIES, todayInZone, type TaskDto, type TaskPriority } from "@plana/shared";
 import { useSidebarQuery } from "@/entities/list";
 import { useTagsQuery } from "@/entities/tag";
-import { useUserTimezone } from "@/entities/task";
+import { useUserTimezone } from "@/entities/user";
 import { useCompleteTask, useUncompleteTask, useUpdateTask } from "@/features/task-manage";
 import { errorMessage } from "@/shared/lib/error-message";
+import { TASK_PRIORITY_LABELS_RU } from "@/shared/lib/priority-labels";
+import { rruleValueLabel } from "@/shared/lib/rrule-label";
 import {
   Button,
   ColorDot,

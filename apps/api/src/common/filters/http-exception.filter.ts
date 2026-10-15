@@ -24,6 +24,21 @@ interface ExceptionPayload {
   details?: unknown;
 }
 
+/** Код ошибки Postgres из исключения или его причины (postgres.js PostgresError). */
+function pgErrorCode(exception: unknown): string | undefined {
+  const candidates = [exception, exception instanceof Error ? exception.cause : null];
+  for (const candidate of candidates) {
+    if (!(candidate instanceof Error)) {
+      continue;
+    }
+    const code = (candidate as { code?: unknown }).code;
+    if (candidate.name === "PostgresError" && typeof code === "string") {
+      return code;
+    }
+  }
+  return undefined;
+}
+
 /** Приводит любые ошибки API к формату { error: { code, message, details? } } (см. docs/architecture/api.md). */
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -31,6 +46,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse<Response>();
+
+    // Гонки check-then-insert (регистрация, теги, неявное создание тегов задачи)
+    // прилетают сюда как unique violation — это конфликт, а не 500.
+    if (pgErrorCode(exception) === "23505") {
+      response.status(HttpStatus.CONFLICT).json({
+        error: { code: "CONFLICT", message: "Запись уже существует" },
+      });
+      return;
+    }
 
     if (!(exception instanceof HttpException)) {
       this.logger.error(exception instanceof Error ? exception.stack : String(exception));

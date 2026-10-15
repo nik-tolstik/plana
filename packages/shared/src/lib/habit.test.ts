@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HabitWithEntriesDto } from "../schemas/habit.js";
-import { habitScheduleLabel, habitStreaks, isDayDone, isScheduledOn } from "./habit.js";
+import { habitStreaks, isDayDone, isScheduledOn } from "./habit.js";
 
 // 2026-10-05 — понедельник.
 const MON = "2026-10-05";
@@ -115,15 +115,5 @@ describe("habitStreaks", () => {
       best: 1,
       total: 1,
     });
-  });
-});
-
-describe("habitScheduleLabel", () => {
-  it("127 — каждый день", () => {
-    expect(habitScheduleLabel(127)).toBe("каждый день");
-  });
-
-  it("42 (вт, чт, сб) — по-русски", () => {
-    expect(habitScheduleLabel(42)).toBe("вт, чт, сб");
   });
 });

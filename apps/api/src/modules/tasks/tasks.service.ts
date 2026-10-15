@@ -35,10 +35,15 @@ import {
   isNull,
   lt,
   lte,
-  ne,
   or,
   sql,
 } from "drizzle-orm";
+import {
+  insertAtPosition,
+  nextPosition,
+  POSITION_STEP,
+  type DbExecutor,
+} from "../../common/positioning";
 import { DB } from "../../db/database.module";
 import type { Db } from "../../db/drizzle";
 import {
@@ -51,7 +56,6 @@ import {
   tasks,
   users,
 } from "../../db/schema";
-import { POSITION_STEP } from "../lists/lists.service";
 
 export type TaskRow = typeof tasks.$inferSelect;
 export type SubtaskRow = typeof subtasks.$inferSelect;
@@ -112,8 +116,8 @@ export class TasksService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   /** Задача владельца вне корзины; чужая или удалённая = 404. */
-  async findOwned(userId: string, taskId: string): Promise<TaskRow> {
-    const [task] = await this.db
+  async findOwned(userId: string, taskId: string, db: DbExecutor = this.db): Promise<TaskRow> {
+    const [task] = await db
       .select()
       .from(tasks)
       .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.trashedAt)))
@@ -136,8 +140,8 @@ export class TasksService {
     return task;
   }
 
-  private async getTimezone(userId: string): Promise<string> {
-    const [row] = await this.db
+  private async getTimezone(userId: string, db: DbExecutor = this.db): Promise<string> {
+    const [row] = await db
       .select({ timezone: users.timezone })
       .from(users)
       .where(eq(users.id, userId))
@@ -184,19 +188,21 @@ export class TasksService {
     );
   }
 
-  private async nextPosition(listId: string, sectionId: string | null): Promise<number> {
-    const [last] = await this.db
-      .select({ position: tasks.position })
-      .from(tasks)
-      .where(and(this.containerCondition(listId, sectionId), isNull(tasks.trashedAt)))
-      .orderBy(desc(tasks.position))
-      .limit(1);
-    return (last?.position ?? -POSITION_STEP) + POSITION_STEP;
+  private nextPosition(db: DbExecutor, listId: string, sectionId: string | null): Promise<number> {
+    return nextPosition(
+      db,
+      tasks,
+      and(this.containerCondition(listId, sectionId), isNull(tasks.trashedAt)),
+    );
   }
 
   /** Позиция перед первой задачей контейнера: новые задачи встают в начало. */
-  private async firstPosition(listId: string, sectionId: string | null): Promise<number> {
-    const [first] = await this.db
+  private async firstPosition(
+    db: DbExecutor,
+    listId: string,
+    sectionId: string | null,
+  ): Promise<number> {
+    const [first] = await db
       .select({ position: tasks.position })
       .from(tasks)
       .where(and(this.containerCondition(listId, sectionId), isNull(tasks.trashedAt)))
@@ -210,12 +216,13 @@ export class TasksService {
    * Чужой якорь или другой контейнер — игнорируем, задача уходит в конец.
    */
   private async positionAfter(
+    db: DbExecutor,
     userId: string,
     listId: string,
     sectionId: string | null,
     afterTaskId: string,
   ): Promise<number | null> {
-    const [after] = await this.db
+    const [after] = await db
       .select({ listId: tasks.listId, sectionId: tasks.sectionId, position: tasks.position })
       .from(tasks)
       .where(and(eq(tasks.id, afterTaskId), eq(tasks.userId, userId), isNull(tasks.trashedAt)))
@@ -223,7 +230,7 @@ export class TasksService {
     if (!after || after.listId !== listId || (after.sectionId ?? null) !== sectionId) {
       return null;
     }
-    const [next] = await this.db
+    const [next] = await db
       .select({ position: tasks.position })
       .from(tasks)
       .where(
@@ -252,31 +259,35 @@ export class TasksService {
     }
     const position =
       dto.afterTaskId !== undefined
-        ? ((await this.positionAfter(userId, listId, sectionId, dto.afterTaskId)) ??
-          (await this.firstPosition(listId, sectionId)))
-        : await this.firstPosition(listId, sectionId);
-    const [created] = await this.db
-      .insert(tasks)
-      .values({
-        userId,
-        listId,
-        sectionId,
-        title: dto.title,
-        description: dto.description ?? "",
-        priority: dto.priority ?? "none",
-        dueDate: dto.dueDate ?? null,
-        dueTime: dto.dueTime ?? null,
-        // Схема гарантирует: rrule только вместе с dueDate (DTSTART = dueDate).
-        rrule: dto.rrule ?? null,
-        rruleStartDate: dto.rrule != null ? (dto.dueDate ?? null) : null,
-        pinned: dto.pinned ?? false,
-        position,
-      })
-      .returning();
-    if (dto.tagNames !== undefined && dto.tagNames.length > 0) {
-      await this.syncTaskTags(userId, created!.id, dto.tagNames);
-    }
-    return this.hydrateTask(created!);
+        ? ((await this.positionAfter(this.db, userId, listId, sectionId, dto.afterTaskId)) ??
+          (await this.firstPosition(this.db, listId, sectionId)))
+        : await this.firstPosition(this.db, listId, sectionId);
+    // Вставка и теги — атомарно: сбой синхронизации тегов не оставляет задачу без них.
+    const created = await this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(tasks)
+        .values({
+          userId,
+          listId,
+          sectionId,
+          title: dto.title,
+          description: dto.description ?? "",
+          priority: dto.priority ?? "none",
+          dueDate: dto.dueDate ?? null,
+          dueTime: dto.dueTime ?? null,
+          // Схема гарантирует: rrule только вместе с dueDate (DTSTART = dueDate).
+          rrule: dto.rrule ?? null,
+          rruleStartDate: dto.rrule != null ? (dto.dueDate ?? null) : null,
+          pinned: dto.pinned ?? false,
+          position,
+        })
+        .returning();
+      if (dto.tagNames !== undefined && dto.tagNames.length > 0) {
+        await this.syncTaskTags(tx, userId, row!.id, dto.tagNames);
+      }
+      return row!;
+    });
+    return this.hydrateTask(created);
   }
 
   async findOne(userId: string, taskId: string): Promise<TaskDto> {
@@ -450,13 +461,17 @@ export class TasksService {
   async update(userId: string, taskId: string, dto: PatchTaskDto): Promise<TaskDto> {
     const task = await this.findOwned(userId, taskId);
 
+    const listChanged = dto.listId !== undefined && dto.listId !== task.listId;
     const listId = dto.listId ?? task.listId;
-    if (dto.listId !== undefined && dto.listId !== task.listId) {
+    if (listChanged) {
       await this.assertListOwned(userId, listId);
     }
 
-    const sectionId = dto.sectionId !== undefined ? dto.sectionId : task.sectionId;
-    if (dto.sectionId !== undefined && sectionId !== null) {
+    // Перенос в другой список без явной секции сбрасывает секцию: секция старого
+    // списка в новом не существует, задача застряла бы в «чужой» секции.
+    const sectionId =
+      dto.sectionId !== undefined ? dto.sectionId : listChanged ? null : task.sectionId;
+    if (sectionId !== null && (dto.sectionId !== undefined || listChanged)) {
       await this.assertSectionInList(userId, sectionId, listId);
     }
 
@@ -479,14 +494,19 @@ export class TasksService {
     if (dto.dueTime !== undefined) values.dueTime = dto.dueTime;
     if (dto.pinned !== undefined) values.pinned = dto.pinned;
     if (dto.listId !== undefined) values.listId = listId;
-    if (dto.sectionId !== undefined) values.sectionId = sectionId;
+    // Сброс секции при смене списка тоже нужно записать (dto.sectionId может
+    // отсутствовать — тогда sectionId уже посчитан как null).
+    if (dto.sectionId !== undefined || listChanged) {
+      values.sectionId = sectionId;
+    }
 
     // Повтор: смена правила или даты перезапускает шаблон с новой даты
     // (rruleStartDate = dueDate), история вхождений сбрасывается; снятие
     // повтора удаляет и якорь, и историю.
     const ruleChanged = dto.rrule !== undefined && dto.rrule !== task.rrule;
     const dateChanged = dto.dueDate !== undefined && dto.dueDate !== task.dueDate;
-    if (ruleChanged || (task.rrule !== null && dateChanged)) {
+    const resetCompletions = ruleChanged || (task.rrule !== null && dateChanged);
+    if (resetCompletions) {
       if (rrule === null) {
         values.rrule = null;
         values.rruleStartDate = null;
@@ -495,66 +515,43 @@ export class TasksService {
         values.rrule = rrule;
         values.rruleStartDate = reAnchor ? dueDate : task.rruleStartDate;
       }
-      await this.db.delete(taskCompletions).where(eq(taskCompletions.taskId, taskId));
     }
 
     const containerChanged = listId !== task.listId || sectionId !== task.sectionId;
     const requestedPosition = dto.position;
 
-    if (requestedPosition === undefined && !containerChanged) {
-      const [updated] = await this.db
-        .update(tasks)
-        .set(values)
-        .where(eq(tasks.id, taskId))
-        .returning();
+    // Запись, сброс истории повторов и синхронизация тегов — атомарно.
+    const updated = await this.db.transaction(async (tx) => {
+      if (resetCompletions) {
+        await tx.delete(taskCompletions).where(eq(taskCompletions.taskId, taskId));
+      }
+      if (requestedPosition !== undefined || containerChanged) {
+        // Перенумеровываем соседей целевого контейнера; position = целевой индекс.
+        await insertAtPosition(
+          tx,
+          tasks,
+          and(this.containerCondition(listId, sectionId), isNull(tasks.trashedAt)),
+          taskId,
+          requestedPosition,
+        );
+      }
+      const [row] = await tx.update(tasks).set(values).where(eq(tasks.id, taskId)).returning();
       if (dto.tagNames !== undefined) {
-        await this.syncTaskTags(userId, taskId, dto.tagNames);
+        await this.syncTaskTags(tx, userId, taskId, dto.tagNames);
       }
-      return this.hydrateTask(updated!);
-    }
-
-    // Перенумеровываем соседей целевого контейнера; position = целевой индекс.
-    const [updated] = await this.db.transaction(async (tx) => {
-      const siblings = await tx
-        .select({ id: tasks.id, position: tasks.position })
-        .from(tasks)
-        .where(
-          and(
-            this.containerCondition(listId, sectionId),
-            isNull(tasks.trashedAt),
-            ne(tasks.id, taskId),
-          ),
-        )
-        .orderBy(asc(tasks.position), asc(tasks.createdAt));
-
-      const index =
-        requestedPosition === undefined
-          ? siblings.length
-          : Math.min(requestedPosition, siblings.length);
-      siblings.splice(index, 0, { id: taskId, position: -1 });
-      for (const [i, sibling] of siblings.entries()) {
-        const position = i * POSITION_STEP;
-        if (sibling.position !== position) {
-          await tx.update(tasks).set({ position }).where(eq(tasks.id, sibling.id));
-        }
-      }
-
-      return tx.update(tasks).set(values).where(eq(tasks.id, taskId)).returning();
+      return row!;
     });
-    if (dto.tagNames !== undefined) {
-      await this.syncTaskTags(userId, taskId, dto.tagNames);
-    }
-    return this.hydrateTask(updated!);
+    return this.hydrateTask(updated);
   }
 
   /** Полная загрузка задачи для ответа: подзадачи + теги. */
-  private async hydrateTask(row: TaskRow): Promise<TaskDto> {
-    const subtaskRows = await this.db
+  private async hydrateTask(row: TaskRow, db: DbExecutor = this.db): Promise<TaskDto> {
+    const subtaskRows = await db
       .select()
       .from(subtasks)
       .where(eq(subtasks.taskId, row.id))
       .orderBy(asc(subtasks.position));
-    const tagRows = await this.db
+    const tagRows = await db
       .select({ id: tags.id, name: tags.name, color: tags.color, icon: tags.icon })
       .from(taskTags)
       .innerJoin(tags, eq(tags.id, taskTags.tagId))
@@ -567,11 +564,17 @@ export class TasksService {
    * Полная замена тегов задачи по именам: отсутствующие теги создаются
    * (неявное создание, lower(name) уникален в рамках пользователя),
    * лишние связи снимаются. Пустой массив снимает все теги.
+   * Выполняется в транзакции вызывающего.
    */
-  private async syncTaskTags(userId: string, taskId: string, names: string[]): Promise<void> {
+  private async syncTaskTags(
+    db: DbExecutor,
+    userId: string,
+    taskId: string,
+    names: string[],
+  ): Promise<void> {
     const tagIds: string[] = [];
     for (const name of names) {
-      const [existing] = await this.db
+      const [existing] = await db
         .select({ id: tags.id })
         .from(tags)
         .where(and(eq(tags.userId, userId), sql`lower(${tags.name}) = lower(${name})`))
@@ -580,22 +583,20 @@ export class TasksService {
         tagIds.push(existing.id);
         continue;
       }
-      const [last] = await this.db
-        .select({ position: tags.position })
-        .from(tags)
-        .where(eq(tags.userId, userId))
-        .orderBy(desc(tags.position))
-        .limit(1);
-      const [created] = await this.db
+      const [created] = await db
         .insert(tags)
-        .values({ userId, name, position: (last?.position ?? -POSITION_STEP) + POSITION_STEP })
+        .values({ userId, name, position: await this.nextTagPosition(db, userId) })
         .returning({ id: tags.id });
       tagIds.push(created!.id);
     }
-    await this.db.delete(taskTags).where(eq(taskTags.taskId, taskId));
+    await db.delete(taskTags).where(eq(taskTags.taskId, taskId));
     if (tagIds.length > 0) {
-      await this.db.insert(taskTags).values(tagIds.map((tagId) => ({ taskId, tagId })));
+      await db.insert(taskTags).values(tagIds.map((tagId) => ({ taskId, tagId })));
     }
+  }
+
+  private nextTagPosition(db: DbExecutor, userId: string): Promise<number> {
+    return nextPosition(db, tags, eq(tags.userId, userId));
   }
 
   /** Список должен существовать и принадлежать пользователю (404 иначе). */
@@ -610,20 +611,20 @@ export class TasksService {
     }
   }
 
-  async complete(userId: string, taskId: string): Promise<TaskDto> {
-    const task = await this.findOwned(userId, taskId);
+  async complete(userId: string, taskId: string, db: DbExecutor = this.db): Promise<TaskDto> {
+    const task = await this.findOwned(userId, taskId, db);
     if (task.completedAt !== null) {
-      return this.hydrateTask(task);
+      return this.hydrateTask(task, db);
     }
     if (task.rrule !== null) {
-      return this.completeOccurrence(userId, task);
+      return this.completeOccurrence(userId, task, db);
     }
-    const [updated] = await this.db
+    const [updated] = await db
       .update(tasks)
       .set({ completedAt: new Date(), updatedAt: new Date() })
       .where(eq(tasks.id, taskId))
       .returning();
-    return this.hydrateTask(updated!);
+    return this.hydrateTask(updated!, db);
   }
 
   /**
@@ -633,19 +634,24 @@ export class TasksService {
    * Правило исчерпано (COUNT/UNTIL) — задача закрывается обычным образом.
    * НЕ идемпотентно: каждый вызов закрывает одно вхождение.
    */
-  private async completeOccurrence(userId: string, task: TaskRow): Promise<TaskDto> {
+  private async completeOccurrence(
+    userId: string,
+    task: TaskRow,
+    db: DbExecutor,
+  ): Promise<TaskDto> {
     const rule = parseRrule(task.rrule!);
     if (rule === null || task.dueDate === null || task.rruleStartDate === null) {
       // Правило валидируется схемой при записи — сюда попадаем только при
       // битых данных (например, правках напрямую в БД).
       throw new BadRequestException({ description: "Правило повтора повреждено" });
     }
-    const timezone = await this.getTimezone(userId);
+    const timezone = await this.getTimezone(userId, db);
     const today = todayInZone(new Date(), timezone);
     const from = compareDays(task.dueDate, today) >= 0 ? task.dueDate : today;
     const next = nextOccurrence(rule, task.rruleStartDate, from);
 
-    const [updated] = await this.db.transaction(async (tx) => {
+    // Внутри batch — это savepoint во внешней транзакции.
+    const [updated] = await db.transaction(async (tx) => {
       await tx.insert(taskCompletions).values({
         taskId: task.id,
         userId,
@@ -661,7 +667,7 @@ export class TasksService {
         .where(eq(tasks.id, task.id))
         .returning();
     });
-    return this.hydrateTask(updated!);
+    return this.hydrateTask(updated!, db);
   }
 
   async uncomplete(userId: string, taskId: string): Promise<TaskDto> {
@@ -700,7 +706,10 @@ export class TasksService {
 
   async trash(userId: string, taskId: string): Promise<void> {
     const task = await this.findOwned(userId, taskId);
-    await this.db.update(tasks).set({ trashedAt: new Date() }).where(eq(tasks.id, task.id));
+    await this.db
+      .update(tasks)
+      .set({ trashedAt: new Date(), updatedAt: new Date() })
+      .where(eq(tasks.id, task.id));
   }
 
   /** Физическое удаление (каскад подзадач, тегов-связей, напоминаний). */
@@ -734,7 +743,8 @@ export class TasksService {
   async batch(userId: string, dto: BatchTasksDto): Promise<BatchResultDto> {
     switch (dto.action) {
       case "complete": {
-        // Повторы идут через completeOccurrence (сдвиг dueDate), поэтому по одной.
+        // Повторы идут через completeOccurrence (сдвиг dueDate), поэтому по одной;
+        // вся пачка — одна транзакция (вложенные complete — savepoint).
         const rows = await this.db
           .select({ id: tasks.id })
           .from(tasks)
@@ -746,9 +756,11 @@ export class TasksService {
               isNull(tasks.completedAt),
             ),
           );
-        for (const row of rows) {
-          await this.complete(userId, row.id);
-        }
+        await this.db.transaction(async (tx) => {
+          for (const row of rows) {
+            await this.complete(userId, row.id, tx);
+          }
+        });
         return { updated: rows.length };
       }
       case "trash": {
@@ -788,14 +800,16 @@ export class TasksService {
           .where(
             and(inArray(tasks.id, dto.taskIds), eq(tasks.userId, userId), isNull(tasks.trashedAt)),
           );
-        let position = await this.nextPosition(listId, sectionId);
-        for (const row of movable) {
-          await this.db
-            .update(tasks)
-            .set({ listId, sectionId, position, updatedAt: new Date() })
-            .where(eq(tasks.id, row.id));
-          position += POSITION_STEP;
-        }
+        await this.db.transaction(async (tx) => {
+          let position = await this.nextPosition(tx, listId, sectionId);
+          for (const row of movable) {
+            await tx
+              .update(tasks)
+              .set({ listId, sectionId, position, updatedAt: new Date() })
+              .where(eq(tasks.id, row.id));
+            position += POSITION_STEP;
+          }
+        });
         return { updated: movable.length };
       }
     }
@@ -811,18 +825,12 @@ export class TasksService {
 
   async createSubtask(userId: string, taskId: string, dto: CreateSubtaskDto): Promise<SubtaskDto> {
     await this.findOwned(userId, taskId);
-    const [last] = await this.db
-      .select({ position: subtasks.position })
-      .from(subtasks)
-      .where(eq(subtasks.taskId, taskId))
-      .orderBy(desc(subtasks.position))
-      .limit(1);
     const [created] = await this.db
       .insert(subtasks)
       .values({
         taskId,
         title: dto.title,
-        position: (last?.position ?? -POSITION_STEP) + POSITION_STEP,
+        position: await nextPosition(this.db, subtasks, eq(subtasks.taskId, taskId)),
       })
       .returning();
     return toSubtaskDto(created!);
@@ -849,19 +857,13 @@ export class TasksService {
     }
 
     return this.db.transaction(async (tx) => {
-      const siblings = await tx
-        .select({ id: subtasks.id, position: subtasks.position })
-        .from(subtasks)
-        .where(and(eq(subtasks.taskId, subtask.taskId), ne(subtasks.id, subtaskId)))
-        .orderBy(asc(subtasks.position), asc(subtasks.createdAt));
-      const index = Math.min(requestedPosition, siblings.length);
-      siblings.splice(index, 0, { id: subtaskId, position: -1 });
-      for (const [i, sibling] of siblings.entries()) {
-        const position = i * POSITION_STEP;
-        if (sibling.position !== position) {
-          await tx.update(subtasks).set({ position }).where(eq(subtasks.id, sibling.id));
-        }
-      }
+      await insertAtPosition(
+        tx,
+        subtasks,
+        eq(subtasks.taskId, subtask.taskId),
+        subtaskId,
+        requestedPosition,
+      );
       const [updated] = await tx
         .update(subtasks)
         .set(values)
@@ -896,13 +898,7 @@ export class TasksService {
 
     // Гидратация после транзакции: до коммита подзадачи не видны вне tx.
     const updatedParent = await this.db.transaction(async (tx) => {
-      const [last] = await tx
-        .select({ position: subtasks.position })
-        .from(subtasks)
-        .where(eq(subtasks.taskId, parent.id))
-        .orderBy(desc(subtasks.position))
-        .limit(1);
-      let position = (last?.position ?? -POSITION_STEP) + POSITION_STEP;
+      let position = await nextPosition(tx, subtasks, eq(subtasks.taskId, parent.id));
       await tx.insert(subtasks).values({
         taskId: parent.id,
         title: task.title,
@@ -936,8 +932,12 @@ export class TasksService {
   async promoteSubtask(userId: string, subtaskId: string): Promise<TaskDto> {
     const subtask = await this.findOwnedSubtask(userId, subtaskId);
     const parent = await this.findOwned(userId, subtask.taskId);
-    const position = await this.positionAfter(userId, parent.listId, parent.sectionId, parent.id);
-    const [created] = await this.db.transaction(async (tx) => {
+    // Позиция и запись — в одной транзакции: чтение позиций вне снапшота
+    // могло бы дать дубликат позиции при параллельном создании.
+    const created = await this.db.transaction(async (tx) => {
+      const position =
+        (await this.positionAfter(tx, userId, parent.listId, parent.sectionId, parent.id)) ??
+        (await this.nextPosition(tx, parent.listId, parent.sectionId));
       const [row] = await tx
         .insert(tasks)
         .values({
@@ -945,12 +945,12 @@ export class TasksService {
           listId: parent.listId,
           sectionId: parent.sectionId,
           title: subtask.title,
-          position: position ?? (await this.nextPosition(parent.listId, parent.sectionId)),
+          position,
           completedAt: subtask.done ? new Date() : null,
         })
         .returning();
       await tx.delete(subtasks).where(eq(subtasks.id, subtask.id));
-      return [row!];
+      return row!;
     });
     return this.hydrateTask(created);
   }

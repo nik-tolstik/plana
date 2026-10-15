@@ -204,6 +204,35 @@ describe("структура: папки, списки, секции (e2e)", () 
     expect(sidebar.rootLists.map((l) => l.id)).toContain(home.id);
   });
 
+  it("restore списка возвращает только задачи, унесённые в корзину вместе с ним", async () => {
+    const temp = listSchema.parse(
+      (await http().post("/v1/lists").set(auth()).send({ name: "Восстановление" }).expect(201))
+        .body,
+    );
+    await http()
+      .post("/v1/tasks")
+      .set(auth())
+      .send({ title: "Уехала со списком", listId: temp.id })
+      .expect(201);
+    const trashedEarlier = (
+      await http()
+        .post("/v1/tasks")
+        .set(auth())
+        .send({ title: "Удалена до списка", listId: temp.id })
+        .expect(201)
+    ).body;
+    await http().delete(`/v1/tasks/${trashedEarlier.id}`).set(auth()).expect(204);
+
+    await http().delete(`/v1/lists/${temp.id}`).set(auth()).expect(204);
+    await http().post(`/v1/lists/${temp.id}/restore`).set(auth()).expect(200);
+
+    const res = await http().get(`/v1/tasks?listId=${temp.id}`).set(auth()).expect(200);
+    expect(res.body.items.map((t: { title: string }) => t.title)).toEqual(["Уехала со списком"]);
+
+    const trash = await http().get("/v1/tasks?smart=trash").set(auth()).expect(200);
+    expect(trash.body.items.map((t: { title: string }) => t.title)).toContain("Удалена до списка");
+  });
+
   it("DELETE /v1/folders/:id — списки папки выходят в корень", async () => {
     const temp = folderSchema.parse(
       (await http().post("/v1/folders").set(auth()).send({ name: "Временная" }).expect(201)).body,

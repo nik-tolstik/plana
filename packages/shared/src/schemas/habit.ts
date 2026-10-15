@@ -9,11 +9,6 @@ export const habitTypeSchema = z.enum(HABIT_TYPES);
 
 export type HabitType = z.infer<typeof habitTypeSchema>;
 
-export const HABIT_TYPE_LABELS_RU: Record<HabitType, string> = {
-  check: "Чекбокс",
-  number: "Число",
-};
-
 /** Палитра привычек — та же, что у списков (мапится в те же CSS-цвета). */
 export const HABIT_COLORS = LIST_COLORS;
 

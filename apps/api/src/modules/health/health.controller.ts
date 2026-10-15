@@ -1,15 +1,17 @@
 import { Controller, Get } from "@nestjs/common";
+import type { HealthDto } from "@plana/shared";
 import { Public } from "../../common/public.decorator";
+import { env } from "../../config/env";
 
 @Controller("health")
 @Public()
 export class HealthController {
   @Get()
-  getHealth() {
+  getHealth(): HealthDto {
     return {
       status: "ok",
-      version: process.env.APP_VERSION ?? "dev",
-      env: process.env.NODE_ENV ?? "development",
+      version: env.APP_VERSION,
+      env: env.NODE_ENV,
     };
   }
 }

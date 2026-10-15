@@ -7,11 +7,22 @@ import {
   structureKeys,
 } from "@/entities/list";
 import { apiCreateFolder, apiDeleteFolder, apiUpdateFolder } from "@/entities/folder";
+import { taskKeys } from "@/entities/task";
 
 /** Все мутации структуры после успеха перезагружают дерево сайдбара. */
 function useInvalidateSidebar() {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: structureKeys.sidebar });
+}
+
+/** Корзина списка меняет и задачи (уезжают/возвращаются вместе с ним). */
+function useInvalidateSidebarAndTasks() {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: structureKeys.sidebar }),
+      queryClient.invalidateQueries({ queryKey: taskKeys.all }),
+    ]);
 }
 
 export function useCreateList() {
@@ -34,12 +45,12 @@ export function useUpdateList() {
 }
 
 export function useTrashList() {
-  const invalidate = useInvalidateSidebar();
+  const invalidate = useInvalidateSidebarAndTasks();
   return useMutation({ mutationFn: apiTrashList, onSuccess: invalidate });
 }
 
 export function useRestoreList() {
-  const invalidate = useInvalidateSidebar();
+  const invalidate = useInvalidateSidebarAndTasks();
   return useMutation({ mutationFn: apiRestoreList, onSuccess: invalidate });
 }
 

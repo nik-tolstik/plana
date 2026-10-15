@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { addDays, todayInZone, type SmartListKey } from "@plana/shared";
-import { useTasksQuery, useUserTimezone } from "@/entities/task";
+import { useTasksQuery } from "@/entities/task";
+import { useUserTimezone } from "@/entities/user";
 import { QuickAdd } from "@/features/quick-add";
 import { PageFade, Skeleton } from "@/shared/ui";
 import { TaskDetails } from "@/widgets/task-details";

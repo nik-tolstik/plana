@@ -1,4 +1,4 @@
-import { useSessionStore } from "@/entities/user";
+import { useSessionStore } from "./session.store";
 
 /** Таймзона пользователя из профиля; до загрузки — системная. */
 export function useUserTimezone(): string {

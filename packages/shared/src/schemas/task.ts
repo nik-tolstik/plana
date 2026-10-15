@@ -10,13 +10,6 @@ export const taskPrioritySchema = z.enum(TASK_PRIORITIES);
 
 export type TaskPriority = z.infer<typeof taskPrioritySchema>;
 
-export const TASK_PRIORITY_LABELS_RU: Record<TaskPriority, string> = {
-  none: "Без приоритета",
-  low: "Низкий",
-  medium: "Средний",
-  high: "Высокий",
-};
-
 // --- Форматы полей ---
 
 /** Календарный день YYYY-MM-DD (локальный день пользователя). */
@@ -119,6 +112,9 @@ export const tasksQuerySchema = z
   });
 
 export type TasksQuery = z.infer<typeof tasksQuerySchema>;
+
+/** Входные значения query GET /v1/tasks (до применения дефолтов limit/offset). */
+export type TasksQueryInput = z.input<typeof tasksQuerySchema>;
 
 // --- Запросы ---
 

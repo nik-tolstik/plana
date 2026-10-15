@@ -1,41 +1,17 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import {
-  CalendarIcon,
-  CheckIcon,
-  FlagIcon,
-  ListIcon,
-  RepeatIcon,
-  RotateCcwIcon,
-  TrashIcon,
-} from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import {
-  TASK_PRIORITIES,
-  TASK_PRIORITY_LABELS_RU,
-  addDays,
-  rruleValueLabel,
-  todayInZone,
-  type PatchTaskDto,
-  type TaskDto,
-} from "@plana/shared";
+import { RepeatIcon } from "lucide-react";
+import { todayInZone, type TaskDto } from "@plana/shared";
 import { useSidebarQuery } from "@/entities/list";
-import { useUserTimezone } from "@/entities/task";
-import {
-  useCompleteTask,
-  useCreateSubtask,
-  useCreateTask,
-  useRestoreTask,
-  useTrashTask,
-  useUncompleteTask,
-  useUpdateTask,
-} from "@/features/task-manage";
-import { errorMessage } from "@/shared/lib/error-message";
+import { useUserTimezone } from "@/entities/user";
+import { rruleValueLabel } from "@/shared/lib/rrule-label";
 import { cn } from "@/shared/lib/cn";
-import { PRIORITY_CLASS } from "@/shared/lib/priority-class";
-import { Checkbox, ContextMenu, EntityMarker, type ContextMenuItem } from "@/shared/ui";
-import { TaskDateChip, TaskPriorityChip, TaskTagsChip } from "./task-chips";
+import { Checkbox, ContextMenu } from "@/shared/ui";
+import { InlineInput } from "./inline-input";
 import { SubtasksBlock } from "./subtasks-block";
+import { TaskDateChip, TaskPriorityChip, TaskTagsChip } from "./task-chips";
+import { buildTaskRowMenu } from "./task-row-menu";
 import { taskDueLabel } from "../model/grouping";
+import { useTaskRowActions } from "../model/use-task-row-actions";
 import type { TaskEditingState } from "../model/editing";
 import { TASK_DRAG_MIME, type TaskDragProps } from "../model/use-drag-reorder";
 
@@ -54,81 +30,7 @@ interface TaskRowProps {
   onEditingChange?: (editing: TaskEditingState | null) => void;
 }
 
-/**
- * Управляемая однострочная (растущая по контенту) строка ввода инлайн-режимов.
- * Фокус и каретка в конец при монтировании.
- */
-function InlineInput({
-  className,
-  value,
-  placeholder,
-  ariaLabel,
-  autoFocus = true,
-  onChange,
-  onCommit,
-  onShiftEnter,
-  onCancel,
-  onBlur,
-}: {
-  className?: string;
-  value: string;
-  placeholder: string;
-  ariaLabel: string;
-  autoFocus?: boolean;
-  onChange: (value: string) => void;
-  onCommit: () => void;
-  onShiftEnter?: () => void;
-  onCancel: () => void;
-  onBlur?: () => void;
-}) {
-  const ref = useRef<HTMLTextAreaElement | null>(null);
-
-  useEffect(() => {
-    const node = ref.current;
-    if (!node || !autoFocus) return;
-    node.focus();
-    node.setSelectionRange(node.value.length, node.value.length);
-    node.style.height = "auto";
-    node.style.height = `${node.scrollHeight}px`;
-  }, [autoFocus]);
-
-  return (
-    <textarea
-      ref={ref}
-      rows={1}
-      aria-label={ariaLabel}
-      placeholder={placeholder}
-      value={value}
-      onChange={(event) => {
-        onChange(event.target.value);
-        event.target.style.height = "auto";
-        event.target.style.height = `${event.target.scrollHeight}px`;
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          if (event.shiftKey && onShiftEnter) {
-            onShiftEnter();
-            return;
-          }
-          onCommit();
-        }
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onCancel();
-        }
-      }}
-      onBlur={() => onBlur?.()}
-      className={cn(
-        // px-0 + leading-6: метрики совпадают со статичной кнопкой названия —
-        // текст не сдвигается при входе/выходе из правки.
-        "w-full resize-none rounded-md bg-transparent px-0 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground",
-        className,
-      )}
-    />
-  );
-}
-
+/** Строка задачи: чекбокс, название, чипы, подзадачи, инлайн-режимы. */
 export function TaskRow({
   task,
   today,
@@ -139,28 +41,30 @@ export function TaskRow({
   editing = null,
   onEditingChange = () => undefined,
 }: TaskRowProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [titleDraft, setTitleDraft] = useState(task.title);
-  const [draft, setDraft] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  // Завершение: сначала проигрываем галочку и схлопывание строки,
-  // только потом PATCH — иначе задача исчезает из списка раньше анимации.
-  const [completing, setCompleting] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const sidebarQuery = useSidebarQuery();
   const timezone = useUserTimezone();
-  const complete = useCompleteTask();
-  const uncomplete = useUncompleteTask();
-  const trash = useTrashTask();
-  const restore = useRestoreTask();
-  const update = useUpdateTask();
-  const createTask = useCreateTask();
-  const createSubtask = useCreateSubtask();
 
-  // Смена задачи (invalidate) сбрасывает черновик названия.
-  useEffect(() => {
-    setTitleDraft(task.title);
-  }, [task.title]);
+  const {
+    expanded,
+    setExpanded,
+    titleDraft,
+    setTitleDraft,
+    draft,
+    setDraft,
+    error,
+    completing,
+    toggleComplete,
+    remove,
+    restoreFromTrash,
+    patchTask,
+    handleTitleEnter,
+    handleTitleShiftEnter,
+    handleTitleBlur,
+    commitNewTask,
+    commitNewTaskAsSubtask,
+    commitNewSubtask,
+  } = useTaskRowActions({ task, onEditingChange });
 
   const mode = editing?.taskId === task.id ? editing.mode : null;
   const doneCount = task.subtasks.filter((subtask) => subtask.done).length;
@@ -174,141 +78,6 @@ export function TaskRow({
   const done = completing || task.completedAt !== null;
   const overZone = dnd?.over?.id === task.id && dnd.draggingId !== task.id ? dnd.over.zone : null;
 
-  async function toggleComplete() {
-    try {
-      if (task.completedAt === null) {
-        setCompleting(true);
-        if (!prefersReducedMotion) {
-          // Галочка + схлопывание строки успевают проиграться до PATCH.
-          await new Promise((resolve) => setTimeout(resolve, 450));
-        }
-        await complete.mutateAsync(task.id);
-        setCompleting(false);
-      } else {
-        await uncomplete.mutateAsync(task.id);
-      }
-    } catch (cause) {
-      setCompleting(false);
-      setError(errorMessage(cause));
-    }
-  }
-
-  async function remove() {
-    try {
-      await trash.mutateAsync(task.id);
-    } catch (cause) {
-      setError(errorMessage(cause));
-    }
-  }
-
-  async function restoreFromTrash() {
-    try {
-      await restore.mutateAsync(task.id);
-    } catch (cause) {
-      setError(errorMessage(cause));
-    }
-  }
-
-  /** Сохранить отредактированное название (если менялось). */
-  async function commitTitle() {
-    const trimmed = titleDraft.trim();
-    if (trimmed.length === 0 || trimmed === task.title) {
-      setTitleDraft(task.title);
-      return;
-    }
-    try {
-      await update.mutateAsync({ taskId: task.id, title: trimmed });
-    } catch (cause) {
-      setError(errorMessage(cause));
-      setTitleDraft(task.title);
-    }
-  }
-
-  /** Enter в правке названия: сохранить и продолжить строкой новой задачи. */
-  function handleTitleEnter() {
-    void commitTitle();
-    setDraft("");
-    onEditingChange({ taskId: task.id, mode: "new-task" });
-  }
-
-  /** Shift+Enter в праве названия: сохранить и продолжить строкой подзадачи. */
-  function handleTitleShiftEnter() {
-    void commitTitle();
-    setDraft("");
-    setExpanded(true);
-    onEditingChange({ taskId: task.id, mode: "new-subtask" });
-  }
-
-  /** Blur названия: просто сохранить и выйти из правки (без открытия панели). */
-  function handleTitleBlur() {
-    void commitTitle();
-    onEditingChange(null);
-  }
-
-  /** Enter в строке новой задачи: создать под текущей, ввод переезжает в неё. */
-  async function commitNewTask() {
-    const trimmed = draft.trim();
-    if (trimmed.length === 0) {
-      onEditingChange(null);
-      return;
-    }
-    try {
-      const created = await createTask.mutateAsync({
-        title: trimmed,
-        // Контекст текущей строки: тот же список/секция/дата.
-        listId: task.listId,
-        sectionId: task.sectionId,
-        dueDate: task.dueDate,
-        afterTaskId: task.id,
-      });
-      setDraft("");
-      onEditingChange({ taskId: created.id, mode: "new-task" });
-    } catch (cause) {
-      setError(errorMessage(cause));
-    }
-  }
-
-  /** Shift+Enter в строке новой задачи: этот текст станет подзадачей текущей. */
-  async function commitNewTaskAsSubtask() {
-    const trimmed = draft.trim();
-    if (trimmed.length === 0) {
-      onEditingChange(null);
-      return;
-    }
-    try {
-      await createSubtask.mutateAsync({ taskId: task.id, title: trimmed });
-      setDraft("");
-      setExpanded(true);
-      onEditingChange({ taskId: task.id, mode: "new-subtask" });
-    } catch (cause) {
-      setError(errorMessage(cause));
-    }
-  }
-
-  async function commitNewSubtask() {
-    const trimmed = draft.trim();
-    if (trimmed.length === 0) {
-      onEditingChange(null);
-      return;
-    }
-    try {
-      await createSubtask.mutateAsync({ taskId: task.id, title: trimmed });
-      setDraft("");
-      // Остаемся в режиме: можно вводить следующую подзадачу.
-    } catch (cause) {
-      setError(errorMessage(cause));
-    }
-  }
-
-  /** Общий PATCH для действий контекстного меню (дата/приоритет/список). */
-  async function patchTask(input: PatchTaskDto) {
-    try {
-      await update.mutateAsync({ taskId: task.id, ...input });
-    } catch (cause) {
-      setError(errorMessage(cause));
-    }
-  }
-
   const todayIso = todayInZone(new Date(), timezone);
   const allLists = sidebarQuery.data
     ? [
@@ -317,97 +86,16 @@ export function TaskRow({
         ...sidebarQuery.data.folders.flatMap((folder) => folder.lists),
       ]
     : [];
-  const currentList = allLists.find((list) => list.id === task.listId);
-
-  const menuItems: ContextMenuItem[] = [
-    {
-      label: task.completedAt ? "Вернуть в работу" : "Завершить",
-      icon: task.completedAt ? (
-        <RotateCcwIcon className="size-4" />
-      ) : (
-        <CheckIcon className="size-4" />
-      ),
-      onSelect: () => void toggleComplete(),
-    },
-  ];
-
-  if (task.trashedAt === null) {
-    menuItems.push(
-      {
-        label: "Дата",
-        icon: <CalendarIcon className="size-4" />,
-        hint: dueLabel ?? "нет",
-        submenu: [
-          {
-            label: "Сегодня",
-            icon: task.dueDate === todayIso ? <CheckIcon className="size-4" /> : undefined,
-            onSelect: () => void patchTask({ dueDate: todayIso }),
-          },
-          {
-            label: "Завтра",
-            icon:
-              task.dueDate === addDays(todayIso, 1) ? <CheckIcon className="size-4" /> : undefined,
-            onSelect: () => void patchTask({ dueDate: addDays(todayIso, 1) }),
-          },
-          {
-            label: "Следующая неделя",
-            icon:
-              task.dueDate === addDays(todayIso, 7) ? <CheckIcon className="size-4" /> : undefined,
-            onSelect: () => void patchTask({ dueDate: addDays(todayIso, 7) }),
-          },
-          {
-            label: "Без даты",
-            icon: task.dueDate === null ? <CheckIcon className="size-4" /> : undefined,
-            onSelect: () => void patchTask({ dueDate: null }),
-          },
-        ],
-      },
-      {
-        label: "Приоритет",
-        icon: <FlagIcon className="size-4" />,
-        hint: TASK_PRIORITY_LABELS_RU[task.priority],
-        submenu: TASK_PRIORITIES.map((priority) => ({
-          label: TASK_PRIORITY_LABELS_RU[priority],
-          icon:
-            priority === task.priority ? (
-              <FlagIcon className={cn("size-4 fill-current", PRIORITY_CLASS[priority])} />
-            ) : undefined,
-          onSelect: () => void patchTask({ priority }),
-        })),
-      },
-      {
-        label: "Список",
-        icon: <ListIcon className="size-4" />,
-        hint: currentList?.name,
-        submenu: allLists.map((list) => ({
-          label: list.name,
-          icon:
-            list.id === task.listId ? (
-              <CheckIcon className="size-4" />
-            ) : (
-              <EntityMarker icon={list.icon} color={list.color} />
-            ),
-          onSelect: () =>
-            void patchTask(list.id === task.listId ? {} : { listId: list.id, sectionId: null }),
-        })),
-      },
-    );
-  }
-
-  menuItems.push(
-    task.trashedAt
-      ? {
-          label: "Восстановить",
-          icon: <RotateCcwIcon className="size-4" />,
-          onSelect: () => void restoreFromTrash(),
-        }
-      : {
-          label: "Удалить",
-          icon: <TrashIcon className="size-4" />,
-          danger: true,
-          onSelect: () => void remove(),
-        },
-  );
+  const menuItems = buildTaskRowMenu({
+    task,
+    todayIso,
+    dueLabel,
+    allLists,
+    toggleComplete,
+    remove,
+    restoreFromTrash,
+    patchTask,
+  });
 
   return (
     // li — обычный (не motion): HTML5 drag-события не должны перехватываться

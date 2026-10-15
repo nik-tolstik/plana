@@ -1,4 +1,4 @@
-import type { SubtaskDto, TaskDto, TaskListDto } from "@plana/shared";
+import type { SubtaskDto, TaskDto, TaskListDto, TasksQueryInput } from "@plana/shared";
 import {
   createSubtaskSchema,
   createTaskSchema,
@@ -8,17 +8,13 @@ import {
   taskListDtoSchema,
   taskSchema,
 } from "@plana/shared";
-import { apiClient } from "@/shared/api/client";
+import { apiClient } from "@/shared/api";
 
-export type TaskListFilter = {
-  smart?: string;
-  listId?: string;
-  /** Поиск по заголовку и описанию (ilike). */
-  q?: string;
-  /** Только задачи с этим тегом. */
-  tagId?: string;
-  limit?: number;
-};
+/**
+ * Фильтр GET /v1/tasks; контракт — tasksQuerySchema из @plana/shared
+ * (smart XOR listId, границы limit), здесь только дефолт выборки.
+ */
+export type TaskListFilter = TasksQueryInput;
 
 function toQuery(filter: TaskListFilter): string {
   const params = new URLSearchParams();

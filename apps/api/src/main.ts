@@ -7,6 +7,8 @@ import { env } from "./config/env";
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix("v1");
+  // SIGTERM/SIGINT закрывают пул postgres и останавливают приём запросов.
+  app.enableShutdownHooks();
 
   const origins = env.CLIENT_ORIGIN.split(",")
     .map((origin) => origin.trim())

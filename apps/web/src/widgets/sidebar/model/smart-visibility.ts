@@ -1,8 +1,10 @@
+import type { SmartListKey as AllSmartListKey } from "@plana/shared";
+
 /**
  * Видимость умных списков в сайдбаре (локальная настройка браузера).
  * Inbox не скрывается — это системный список по умолчанию.
  */
-export type SmartListKey = "today" | "tomorrow" | "next7" | "all" | "completed" | "trash";
+export type SmartListKey = Exclude<AllSmartListKey, "inbox">;
 
 const STORAGE_KEY = "plana.hiddenSmartLists";
 

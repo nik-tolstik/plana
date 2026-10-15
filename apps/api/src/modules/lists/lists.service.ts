@@ -6,15 +6,13 @@ import type {
   SectionDto,
   CreateSectionDto,
 } from "@plana/shared";
-import { and, asc, desc, eq, isNull, ne } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
+import { insertAtPosition, nextPosition } from "../../common/positioning";
 import { DB } from "../../db/database.module";
 import type { Db } from "../../db/drizzle";
 import { folders, lists, sections, tasks } from "../../db/schema";
 
 export type ListRow = typeof lists.$inferSelect;
-
-/** Шаг между соседними позициями (см. docs/architecture/erd.md — position шаг 1024). */
-export const POSITION_STEP = 1024;
 
 export function toListDto(row: ListRow): ListDto {
   return {
@@ -54,16 +52,12 @@ export class ListsService {
     return folderId === null ? isNull(lists.folderId) : eq(lists.folderId, folderId);
   }
 
-  private async nextPosition(userId: string, folderId: string | null): Promise<number> {
-    const [last] = await this.db
-      .select({ position: lists.position })
-      .from(lists)
-      .where(
-        and(eq(lists.userId, userId), this.containerCondition(folderId), isNull(lists.trashedAt)),
-      )
-      .orderBy(desc(lists.position))
-      .limit(1);
-    return (last?.position ?? -POSITION_STEP) + POSITION_STEP;
+  private listContainer(userId: string, folderId: string | null) {
+    return and(
+      eq(lists.userId, userId),
+      this.containerCondition(folderId),
+      isNull(lists.trashedAt),
+    );
   }
 
   async create(userId: string, dto: CreateListDto): Promise<ListDto> {
@@ -79,7 +73,7 @@ export class ListsService {
       }
       folderId = folder.id;
     }
-    const position = await this.nextPosition(userId, folderId);
+    const position = await nextPosition(this.db, lists, this.listContainer(userId, folderId));
     const [created] = await this.db
       .insert(lists)
       .values({
@@ -151,31 +145,13 @@ export class ListsService {
     // Перенумеровываем соседей в целевом контейнере; position = целевой индекс.
     const requestedPosition = dto.position;
     return this.db.transaction(async (tx) => {
-      const siblings = await tx
-        .select({ id: lists.id, position: lists.position })
-        .from(lists)
-        .where(
-          and(
-            eq(lists.userId, userId),
-            this.containerCondition(folderId),
-            isNull(lists.trashedAt),
-            ne(lists.id, listId),
-          ),
-        )
-        .orderBy(asc(lists.position), asc(lists.createdAt));
-
-      const index =
-        requestedPosition === undefined
-          ? siblings.length
-          : Math.min(requestedPosition, siblings.length);
-      siblings.splice(index, 0, { id: listId, position: -1 });
-      for (const [i, sibling] of siblings.entries()) {
-        const position = i * POSITION_STEP;
-        if (sibling.position !== position) {
-          await tx.update(lists).set({ position }).where(eq(lists.id, sibling.id));
-        }
-      }
-
+      await insertAtPosition(
+        tx,
+        lists,
+        this.listContainer(userId, folderId),
+        listId,
+        requestedPosition,
+      );
       const [updated] = await tx.update(lists).set(values).where(eq(lists.id, listId)).returning();
       return toListDto(updated!);
     });
@@ -207,8 +183,15 @@ export class ListsService {
     if (!list || list.trashedAt === null) {
       throw new NotFoundException({ description: "Список в корзине не найден" });
     }
+    const listTrashedAt = list.trashedAt;
     const restored = await this.db.transaction(async (tx) => {
-      await tx.update(tasks).set({ trashedAt: null }).where(eq(tasks.listId, listId));
+      // Возвращаем только задачи, унесённые в корзину вместе со списком
+      // (их trashedAt совпадает с отметкой списка — ставились одним now());
+      // задачи, trashed-нутые по отдельности до этого, остаются в корзине.
+      await tx
+        .update(tasks)
+        .set({ trashedAt: null, updatedAt: new Date() })
+        .where(and(eq(tasks.listId, listId), eq(tasks.trashedAt, listTrashedAt)));
       const [row] = await tx
         .update(lists)
         .set({ trashedAt: null, updatedAt: new Date() })
@@ -221,18 +204,12 @@ export class ListsService {
 
   async createSection(userId: string, listId: string, dto: CreateSectionDto): Promise<SectionDto> {
     await this.findOwned(userId, listId);
-    const [last] = await this.db
-      .select({ position: sections.position })
-      .from(sections)
-      .where(eq(sections.listId, listId))
-      .orderBy(desc(sections.position))
-      .limit(1);
     const [created] = await this.db
       .insert(sections)
       .values({
         listId,
         name: dto.name,
-        position: (last?.position ?? -POSITION_STEP) + POSITION_STEP,
+        position: await nextPosition(this.db, sections, eq(sections.listId, listId)),
       })
       .returning();
     return toSectionDto(created!);

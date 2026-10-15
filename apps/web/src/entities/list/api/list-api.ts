@@ -1,6 +1,6 @@
 import type { ListDto, SidebarDto } from "@plana/shared";
 import { createListSchema, listSchema, patchListSchema, sidebarDtoSchema } from "@plana/shared";
-import { apiClient } from "@/shared/api/client";
+import { apiClient } from "@/shared/api";
 
 /** Дерево сайдбара одним запросом (GET /v1/folders). */
 export function apiGetSidebar(): Promise<SidebarDto> {

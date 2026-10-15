@@ -1,7 +1,7 @@
 import type { TagDto } from "@plana/shared";
 import { createTagSchema, patchTagSchema, tagSchema } from "@plana/shared";
 import { z } from "zod";
-import { apiClient } from "@/shared/api/client";
+import { apiClient } from "@/shared/api";
 
 /** Все теги пользователя (упорядочены по position). */
 export function apiGetTags(): Promise<TagDto[]> {

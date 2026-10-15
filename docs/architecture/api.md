@@ -1,6 +1,6 @@
 # Plana — структура API
 
-REST поверх NestJS, префикс `/v1`, OpenAPI/Swagger генерируется декораторами (`/docs` — только в develop-окружении). Схема БД: `docs/architecture/erd.md`. Контракты запросов/ответов (zod-схемы) живут в `packages/shared` и переиспользуются фронтом.
+REST поверх NestJS, префикс `/v1`. Схема БД: `docs/architecture/erd.md`. Контракты запросов/ответов (zod-схемы) живут в `packages/shared` и переиспользуются фронтом. OpenAPI/Swagger (`/docs` в develop) — запланировано, пока не подключено.
 
 ## Конвенции
 
@@ -22,31 +22,31 @@ REST поверх NestJS, префикс `/v1`, OpenAPI/Swagger генериру
 Коды: `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `CONFLICT` (409, напр. email занят), `PAYLOAD_TOO_LARGE` (413), `RATE_LIMITED` (429), `INTERNAL` (500).
 
 - Авторизация: `Authorization: Bearer <accessToken>`. Access-токен — JWT, 15 минут. Refresh — opaque-токен, 30 дней, ротация при каждом использовании, хранится хэшем (см. ERD). Компромисс MVP: refresh в localStorage на клиенте (междоменные httpOnly-cookie между `*.vercel.app` и `*.up.railway.app` ненадёжны, особенно в PWA на iOS); при XSS-угрозе смягчается ротацией и отзывом всех сессий. Улучшение post-MVP — переход на BFF или first-party домен.
-- Rate limiting: NestJS Throttler — 100 req/мин на пользователя, 20 req/мин на auth-эндпоинты.
+- Rate limiting: NestJS Throttler — 100 req/мин на пользователя, 20 req/мин на auth-эндпоинты (запланировано, не подключено).
 
 ## Auth
 
-| Метод и путь                   | Назначение                                                                                                                                                               |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `POST /v1/auth/register`       | `{ email, password, name }` → `{ accessToken, refreshToken, user }`. Создаёт Inbox-список.                                                                               |
-| `POST /v1/auth/login`          | `{ email, password }` → токены + user                                                                                                                                    |
-| `POST /v1/auth/refresh`        | `{ refreshToken }` → новые токены (старый отзывается)                                                                                                                    |
-| `POST /v1/auth/logout`         | `{ refreshToken }` — отзывает одну сессию                                                                                                                                |
-| `POST /v1/auth/logout-all`     | отзывает все сессии пользователя                                                                                                                                         |
-| `GET /v1/auth/google`          | 302 на Google OAuth (scope: openid email profile, `state` — одноразовый)                                                                                                 |
-| `GET /v1/auth/google/callback` | обмен кода; если Google-email найден — вход, иначе — регистрация+связка; 302 на фронт `/?authCode=...`; фронт обменивает `authCode` через `POST /v1/auth/oauth/exchange` |
+| Метод и путь                   | Назначение                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------ |
+| `POST /v1/auth/register`       | `{ email, password, name }` → `{ accessToken, refreshToken, user }`. Создаёт Inbox-список. |
+| `POST /v1/auth/login`          | `{ email, password }` → токены + user                                                      |
+| `POST /v1/auth/refresh`        | `{ refreshToken }` → новые токены (старый отзывается)                                      |
+| `POST /v1/auth/logout`         | `{ refreshToken }` — отзывает одну сессию                                                  |
+| `POST /v1/auth/logout-all`     | отзывает все сессии пользователя                                                           |
+| `GET /v1/auth/google`          | 302 на Google OAuth (планируется, M8)                                                      |
+| `GET /v1/auth/google/callback` | обмен кода; если Google-email найден — вход, иначе — регистрация+связка (планируется, M8)  |
 
-`POST /v1/auth/oauth/exchange`: `{ authCode }` → токены + user (authCode одноразовый, 60 сек).
+`POST /v1/auth/oauth/exchange`: `{ authCode }` → токены + user (authCode одноразовый, 60 сек) — планируется вместе с Google OAuth (M8).
 
 `GET /v1/auth/me` — дублируется как `GET /v1/me` (см. профиль) — используем `/v1/me`.
 
 ## Профиль
 
-| Метод и путь    | Назначение                                                   |
-| --------------- | ------------------------------------------------------------ |
-| `GET /v1/me`    | текущий пользователь                                         |
-| `PATCH /v1/me`  | `{ name?, timezone?, theme? }`                               |
-| `DELETE /v1/me` | удаление аккаунта (каскад, подтверждение паролем на клиенте) |
+| Метод и путь    | Назначение                                                                 |
+| --------------- | -------------------------------------------------------------------------- |
+| `GET /v1/me`    | текущий пользователь                                                       |
+| `PATCH /v1/me`  | `{ name?, timezone?, theme? }`                                             |
+| `DELETE /v1/me` | удаление аккаунта (каскад, подтверждение паролем на клиенте) — планируется |
 
 ## Структура (folders, lists, sections)
 
@@ -72,7 +72,7 @@ REST поверх NestJS, префикс `/v1`, OpenAPI/Swagger генериру
 | Метод и путь                    | Назначение                                                                                                                                                                                                                                                                                                                               |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /v1/tasks`                 | фильтры: `listId`, `smart` (`inbox` \| `today` \| `tomorrow` \| `next7` \| `all` \| `completed` \| `trash`), `q` (поиск ILIKE по title/description, спецсимволы `% _ \` экранируются), `tagId`, `limit/offset`. Реализовано в M5; `sectionId`, `priority`, `completed` (bool) — будущие этапы. Возвращает задачи с подзадачами и тегами. |
-| `POST /v1/tasks`                | `{ title, description?, priority?, dueDate?, dueTime?, rrule?, listId? (default Inbox), sectionId?, tagNames?, pinned? }`                                                                                                                                                                                                                |
+| `POST /v1/tasks`                | `{ title, description?, priority?, dueDate?, dueTime?, rrule?, listId? (default Inbox), sectionId?, tagNames?, pinned?, afterTaskId? }` — `afterTaskId` вставляет задачу сразу после указанной в том же контейнере (инлайн-ввод)                                                                                                         |
 | `GET /v1/tasks/:id`             | одна задача со всеми подзадачами и тегами (вложения и напоминания — будущие этапы)                                                                                                                                                                                                                                                       |
 | `PATCH /v1/tasks/:id`           | любые поля; `tagNames` — полная замена тегов по именам (несуществующие создаются неявно, дубликаты по lower(name) в одном запросе → 400); `reminders` — массив `{ offsetMinutes }` (полная замена, будущий этап)                                                                                                                         |
 | `DELETE /v1/tasks/:id`          | в корзину (`?purge=true` — сразу физически, доступно и из корзины). Корзина хранит 30 дней: при запросе `smart=trash` задачи старше 30 дней физически удаляются (lazy purge)                                                                                                                                                             |
@@ -84,14 +84,17 @@ REST поверх NestJS, префикс `/v1`, OpenAPI/Swagger генериру
 
 ### Подзадачи и теги
 
-| Метод и путь                      | Назначение                     |
-| --------------------------------- | ------------------------------ |
-| `POST /v1/tasks/:taskId/subtasks` | `{ title }`                    |
-| `PATCH /v1/subtasks/:id`          | `{ title?, done?, position? }` |
-| `DELETE /v1/subtasks/:id`         |                                |
-| `GET /v1/tags`                    | все теги пользователя          |
-| `PATCH /v1/tags/:id`              | `{ name?, position? }`         |
-| `DELETE /v1/tags/:id`             | отвязывается от всех задач     |
+| Метод и путь                      | Назначение                                                                                 |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| `POST /v1/tasks/:taskId/subtasks` | `{ title }`                                                                                |
+| `PATCH /v1/subtasks/:id`          | `{ title?, done?, position? }`                                                             |
+| `DELETE /v1/subtasks/:id`         |                                                                                            |
+| `POST /v1/tasks/:id/nest`         | `{ parentTaskId }` — задача становится подзадачей (тот же список; мета-поля отбрасываются) |
+| `POST /v1/subtasks/:id/promote`   | подзадача становится отдельной задачей сразу после родительской                            |
+| `GET /v1/tags`                    | все теги пользователя                                                                      |
+| `POST /v1/tags`                   | `{ name, color?, icon? }`                                                                  |
+| `PATCH /v1/tags/:id`              | `{ name?, color?, icon?, position? }`                                                      |
+| `DELETE /v1/tags/:id`             | отвязывается от всех задач                                                                 |
 
 Теги на задаче ставятся через `POST/PATCH /v1/tasks` полем `tagNames: string[]` (имена, не id; до 20, дубликаты по lower(name) в одном запросе → 400): несуществующие теги создаются неявно, уникальность имён в рамках пользователя по lower(name). Отклонение от исходного плана (`tagIds`) — осознанное: клиенту не нужно знать id, а неявное создание покрывает quick-add с хештегами одним запросом (см. decisions.md, часть 8).
 
@@ -101,7 +104,7 @@ REST поверх NestJS, префикс `/v1`, OpenAPI/Swagger генериру
 
 Семантика: `dueDate/dueTime` всегда следующее вхождение. Завершение повторяющейся задачи — запись в `task_completions` + сдвиг `dueDate` на первое вхождение после `max(dueDate, сегодня)` (просроченные вхождения пропускаются); правило исчерпано (COUNT/UNTIL) — задача закрывается через `completedAt`. Отмена (`uncomplete`) удаляет последнюю запись истории и возвращает `dueDate` к закрытому вхождению. Смена `rrule` или `dueDate` перезапускает шаблон (`rruleStartDate` = новая дата) и очищает историю. `rrule` без `dueDate` → 400 (create-схема и merge-проверка в PATCH).
 
-## Вложения
+## Вложения (планируется)
 
 | Метод и путь                         | Назначение                                                                                                                                                                                         |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -110,7 +113,7 @@ REST поверх NestJS, префикс `/v1`, OpenAPI/Swagger генериру
 | `GET /v1/attachments/:id/url`        | presigned GET (срок 1 час)                                                                                                                                                                         |
 | `DELETE /v1/attachments/:id`         | метаданные + объект в бакете                                                                                                                                                                       |
 
-## Web Push
+## Web Push (планируется)
 
 | Метод и путь                | Назначение                                                                     |
 | --------------------------- | ------------------------------------------------------------------------------ |
@@ -141,20 +144,20 @@ REST поверх NestJS, префикс `/v1`, OpenAPI/Swagger генериру
 
 ```
 apps/api/src/
-  main.ts                    # bootstrap, префикс /v1, CORS, Swagger (develop)
+  main.ts                    # bootstrap, префикс /v1, CORS, shutdown hooks
   app.module.ts
   db/                        # drizzle client, schema, миграции
   modules/
-    auth/                    # контроллер, сервис, guards, strategies (jwt, google-oauth)
+    auth/                    # контроллер, сервис, guards, strategy (jwt)
     users/                   # /v1/me
     folders/  lists/  sections/
-    tasks/                   # + subtasks, reminders внутри (единый агрегат)
+    tasks/                   # + subtasks внутри (единый агрегат)
     tags/
-    attachments/             # + s3-клиент
-    push/                    # подписки + web-push отправка
     habits/
-    worker/                  # cron: напоминания, чистка (отдельный процесс, тот же код)
-  common/                    # фильтры ошибок, интерсепторы, декораторы
+    health/
+  common/                    # фильтры ошибок, zod-пайпы, декораторы, позиционные хелперы
 ```
+
+Запланированные модули (см. roadmap): `attachments/` (+ s3-клиент), `push/`, `worker/` (cron: напоминания, чистка).
 
 Принятые внутри модулей правила: контроллер тонкий (только HTTP-слой), вся логика в сервисе, доступ к БД только через сервисы, zod-схемы запросов — из `@plana/shared`, маппинг DTO → camelCase Drizzle в сервисе.

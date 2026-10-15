@@ -321,6 +321,30 @@ describe("задачи: CRUD, подзадачи, умные списки, quick
     await http().get(`/v1/tasks?listId=${strangerList.id}`).set(auth()).expect(404);
   });
 
+  it("PATCH /v1/tasks/:id — перенос в другой список сбрасывает секцию старого списка", async () => {
+    const inSection = await createTask({
+      title: "В секции",
+      listId: work.id,
+      sectionId: section.id,
+    });
+    const other = (
+      await http().post("/v1/lists").set(auth()).send({ name: "Другой список" }).expect(201)
+    ).body;
+
+    // listId без явного sectionId: секция «Работы» не должна тянуться за задачей.
+    const moved = taskSchema.parse(
+      (
+        await http()
+          .patch(`/v1/tasks/${inSection.id}`)
+          .set(auth())
+          .send({ listId: other.id })
+          .expect(200)
+      ).body,
+    );
+    expect(moved.listId).toBe(other.id);
+    expect(moved.sectionId).toBeNull();
+  });
+
   it("POST /v1/tasks afterTaskId — вставка между задачами того же контейнера", async () => {
     const list = (await http().post("/v1/lists").set(auth()).send({ name: "Инлайн" }).expect(201))
       .body;

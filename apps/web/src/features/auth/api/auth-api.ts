@@ -1,5 +1,5 @@
 import { authResponseSchema, loginSchema, registerSchema, type AuthResponse } from "@plana/shared";
-import { apiClient } from "@/shared/api/client";
+import { apiClient } from "@/shared/api";
 
 export function apiRegister(input: typeof registerSchema._input): Promise<AuthResponse> {
   return apiClient.post("/v1/auth/register", authResponseSchema, input);

@@ -7,11 +7,11 @@ import type {
   SetHabitEntryDto,
 } from "@plana/shared";
 import { addDays, compareDays, dayStringSchema, todayInZone } from "@plana/shared";
-import { and, asc, desc, eq, gte, inArray, ne } from "drizzle-orm";
+import { and, asc, eq, gte, inArray } from "drizzle-orm";
+import { insertAtPosition, nextPosition } from "../../common/positioning";
 import { DB } from "../../db/database.module";
 import type { Db } from "../../db/drizzle";
 import { habitEntries, habits, users } from "../../db/schema";
-import { POSITION_STEP } from "../lists/lists.service";
 
 export type HabitRow = typeof habits.$inferSelect;
 export type HabitEntryRow = typeof habitEntries.$inferSelect;
@@ -103,12 +103,6 @@ export class HabitsService {
   }
 
   async create(userId: string, dto: CreateHabitDto): Promise<HabitWithEntriesDto> {
-    const [last] = await this.db
-      .select({ position: habits.position })
-      .from(habits)
-      .where(eq(habits.userId, userId))
-      .orderBy(desc(habits.position))
-      .limit(1);
     const [created] = await this.db
       .insert(habits)
       .values({
@@ -118,7 +112,7 @@ export class HabitsService {
         targetValue: dto.type === "number" ? dto.targetValue! : null,
         daysOfWeek: dto.daysOfWeek ?? 127,
         color: dto.color ?? "gray",
-        position: (last?.position ?? -POSITION_STEP) + POSITION_STEP,
+        position: await nextPosition(this.db, habits, eq(habits.userId, userId)),
       })
       .returning();
     return toHabitDto(created!, []);
@@ -155,19 +149,7 @@ export class HabitsService {
     // position — целевой индекс среди привычек пользователя; перенумерация шагом 1024.
     const requestedPosition = dto.position;
     const [updated] = await this.db.transaction(async (tx) => {
-      const siblings = await tx
-        .select({ id: habits.id, position: habits.position })
-        .from(habits)
-        .where(and(eq(habits.userId, userId), ne(habits.id, habitId)))
-        .orderBy(asc(habits.position), asc(habits.createdAt));
-      const index = Math.min(requestedPosition, siblings.length);
-      siblings.splice(index, 0, { id: habitId, position: -1 });
-      for (const [i, sibling] of siblings.entries()) {
-        const position = i * POSITION_STEP;
-        if (sibling.position !== position) {
-          await tx.update(habits).set({ position }).where(eq(habits.id, sibling.id));
-        }
-      }
+      await insertAtPosition(tx, habits, eq(habits.userId, userId), habitId, requestedPosition);
       return tx.update(habits).set(values).where(eq(habits.id, habitId)).returning();
     });
     return toHabitDto(updated!, await this.loadEntries(habitId));

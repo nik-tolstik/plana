@@ -1,10 +1,11 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { CreateFolderDto, FolderDto, PatchFolderDto, SidebarDto } from "@plana/shared";
-import { and, asc, desc, eq, isNull, ne } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
+import { insertAtPosition, nextPosition } from "../../common/positioning";
 import { DB } from "../../db/database.module";
 import type { Db } from "../../db/drizzle";
 import { folders, lists } from "../../db/schema";
-import { POSITION_STEP, toListDto } from "../lists/lists.service";
+import { toListDto } from "../lists/lists.service";
 
 export type FolderRow = typeof folders.$inferSelect;
 
@@ -74,18 +75,12 @@ export class FoldersService {
   }
 
   async create(userId: string, dto: CreateFolderDto): Promise<FolderDto> {
-    const [last] = await this.db
-      .select({ position: folders.position })
-      .from(folders)
-      .where(eq(folders.userId, userId))
-      .orderBy(desc(folders.position))
-      .limit(1);
     const [created] = await this.db
       .insert(folders)
       .values({
         userId,
         name: dto.name,
-        position: (last?.position ?? -POSITION_STEP) + POSITION_STEP,
+        position: await nextPosition(this.db, folders, eq(folders.userId, userId)),
       })
       .returning();
     if (!created) {
@@ -109,24 +104,7 @@ export class FoldersService {
     // position = целевой индекс среди папок пользователя, перенумеровываем соседей.
     const requestedPosition = dto.position;
     return this.db.transaction(async (tx) => {
-      const siblings = await tx
-        .select({ id: folders.id, position: folders.position })
-        .from(folders)
-        .where(and(eq(folders.userId, userId), ne(folders.id, folderId)))
-        .orderBy(asc(folders.position), asc(folders.createdAt));
-
-      const index =
-        requestedPosition === undefined
-          ? siblings.length
-          : Math.min(requestedPosition, siblings.length);
-      siblings.splice(index, 0, { id: folderId, position: -1 });
-      for (const [i, sibling] of siblings.entries()) {
-        const position = i * POSITION_STEP;
-        if (sibling.position !== position) {
-          await tx.update(folders).set({ position }).where(eq(folders.id, sibling.id));
-        }
-      }
-
+      await insertAtPosition(tx, folders, eq(folders.userId, userId), folderId, requestedPosition);
       const [updated] = await tx
         .update(folders)
         .set({ name: dto.name ?? folder.name, updatedAt: new Date() })

@@ -1,14 +1,10 @@
 import { CheckIcon, FlagIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import {
-  TASK_PRIORITIES,
-  TASK_PRIORITY_LABELS_RU,
-  type PatchTaskDto,
-  type TaskDto,
-} from "@plana/shared";
+import { TASK_PRIORITIES, type PatchTaskDto, type TaskDto } from "@plana/shared";
 import { useTagsQuery } from "@/entities/tag";
 import { cn } from "@/shared/lib/cn";
 import { PRIORITY_CLASS } from "@/shared/lib/priority-class";
+import { TASK_PRIORITY_LABELS_RU } from "@/shared/lib/priority-labels";
 import { DateTimePicker, ENTITY_COLORS, Popover } from "@/shared/ui";
 
 interface TaskChipProps {

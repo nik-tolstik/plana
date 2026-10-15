@@ -6,7 +6,7 @@ import type {
 } from "@plana/shared";
 import { habitEntrySchema, habitWithEntriesSchema, patchHabitSchema } from "@plana/shared";
 import { z } from "zod";
-import { apiClient } from "@/shared/api/client";
+import { apiClient } from "@/shared/api";
 
 /** Все привычки + вхождения за последние 60 дней. */
 export function apiGetHabits(): Promise<HabitWithEntriesDto[]> {

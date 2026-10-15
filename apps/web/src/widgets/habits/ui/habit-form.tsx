@@ -1,17 +1,11 @@
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { PlusIcon } from "lucide-react";
-import {
-  HABIT_COLORS,
-  HABIT_TYPE_LABELS_RU,
-  HABIT_TYPES,
-  HABIT_WEEKDAY_SHORT_RU,
-  type HabitType,
-  type ListColor,
-} from "@plana/shared";
+import { HABIT_COLORS, HABIT_TYPES, type HabitType, type ListColor } from "@plana/shared";
 import { useCreateHabit } from "@/features/habit-manage";
 import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
+import { HABIT_TYPE_LABELS_RU, HABIT_WEEKDAY_SHORT_RU } from "@/shared/lib/habit-label";
 import { Button, Input, Label, Select } from "@/shared/ui";
 import { ENTITY_COLORS } from "@/shared/ui";
 

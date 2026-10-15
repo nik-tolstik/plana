@@ -6,7 +6,11 @@ const REFRESH_KEY = "plana.refreshToken";
 let accessToken: string | null = null;
 let refreshToken: string | null = localStorage.getItem(REFRESH_KEY);
 
-type SessionListener = (user: UserDto) => void;
+/**
+ * Слушатель сессии: получает пользователя при успешном обновлении токенов
+ * и null, когда refresh окончательно не удался (токен отозван/истёк).
+ */
+type SessionListener = (user: UserDto | null) => void;
 let sessionListener: SessionListener | null = null;
 
 /**
@@ -52,6 +56,8 @@ export function refreshAccessToken(): Promise<string | null> {
       });
       if (!response.ok) {
         session.clear();
+        // Сообщаем слушателю об окончательной потере сессии (не о сетевой ошибке).
+        sessionListener?.(null);
         return null;
       }
       const data = authResponseSchema.parse(await response.json());

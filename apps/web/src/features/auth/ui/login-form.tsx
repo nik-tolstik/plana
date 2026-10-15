@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { useSessionStore } from "@/entities/user";
-import { ApiError } from "@/shared/api/client";
-import { session } from "@/shared/api/session";
+import { ApiError } from "@/shared/api";
+import { session } from "@/shared/api";
 import { Button, Input, Label } from "@/shared/ui";
 import { apiLogin } from "../api/auth-api";
-import { applyTheme } from "@/features/theme-switch/model/theme";
+import { applyTheme } from "@/features/theme-switch";
 
 export function LoginForm() {
   const navigate = useNavigate();

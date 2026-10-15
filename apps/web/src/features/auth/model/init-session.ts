@@ -1,6 +1,7 @@
 import { useSessionStore } from "@/entities/user";
-import { refreshAccessToken, session } from "@/shared/api/session";
-import { applyTheme } from "@/features/theme-switch/model/theme";
+import { refreshAccessToken, session } from "@/shared/api";
+import { queryClient } from "@/shared/lib/query-client";
+import { applyTheme } from "@/features/theme-switch";
 
 /**
  * Инициализация сессии при старте приложения:
@@ -8,6 +9,13 @@ import { applyTheme } from "@/features/theme-switch/model/theme";
  */
 export async function initSession(): Promise<void> {
   session.setSessionListener((user) => {
+    if (user === null) {
+      // Рефреш окончательно не удался — уходим в аноним и чистим кэш,
+      // чтобы данные прошлого пользователя не достались следующему.
+      queryClient.clear();
+      useSessionStore.getState().setAnon();
+      return;
+    }
     applyTheme(user.theme);
     useSessionStore.getState().setAuthed(user);
   });
@@ -17,9 +25,6 @@ export async function initSession(): Promise<void> {
     return;
   }
 
-  // При успехе слушатель выше уже выставил authed; при неудаче — аноним.
-  const token = await refreshAccessToken();
-  if (token === null) {
-    useSessionStore.getState().setAnon();
-  }
+  // При успехе слушатель выше уже выставил authed; при неудаче — тоже (null).
+  await refreshAccessToken();
 }

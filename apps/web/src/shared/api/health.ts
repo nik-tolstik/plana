@@ -1,14 +1,8 @@
-import { z } from "zod";
-import { apiClient } from "./client";
+import { healthDtoSchema, type HealthDto } from "@plana/shared";
+import { apiClient } from "@/shared/api";
 
-const healthSchema = z.object({
-  status: z.string(),
-  version: z.string(),
-  env: z.string(),
-});
+export type { HealthDto };
 
-export type Health = z.infer<typeof healthSchema>;
-
-export function fetchHealth(): Promise<Health> {
-  return apiClient.get("/v1/health", healthSchema);
+export function fetchHealth(): Promise<HealthDto> {
+  return apiClient.get("/v1/health", healthDtoSchema);
 }

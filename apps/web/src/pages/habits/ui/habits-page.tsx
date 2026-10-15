@@ -1,6 +1,6 @@
 import { todayInZone } from "@plana/shared";
 import { useHabitsQuery } from "@/entities/habit";
-import { useUserTimezone } from "@/entities/task";
+import { useUserTimezone } from "@/entities/user";
 import { PageFade, Skeleton } from "@/shared/ui";
 import { HabitForm, HabitsList } from "@/widgets/habits";
 

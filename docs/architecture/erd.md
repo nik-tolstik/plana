@@ -100,6 +100,7 @@ erDiagram
 | folder_id  | uuid → folders null, ON DELETE SET NULL (папку удалили — списки остались) |
 | name       | text not null                                                             |
 | color      | text not null default 'gray' (ключ из фиксированной палитры фронтенда)    |
+| icon       | text null (ключ из фиксированного реестра иконок фронтенда)               |
 | emoji      | text null (один эмодзи-символ)                                            |
 | kind       | enum('inbox','regular') not null default 'regular'                        |
 | position   | integer not null                                                          |
@@ -158,12 +159,14 @@ erDiagram
 
 ### tags
 
-| Колонка  | Тип                  |
-| -------- | -------------------- |
-| id       | uuid PK              |
-| user_id  | uuid → users CASCADE |
-| name     | text not null        |
-| position | integer not null     |
+| Колонка  | Тип                                                          |
+| -------- | ------------------------------------------------------------ |
+| id       | uuid PK                                                      |
+| user_id  | uuid → users CASCADE                                         |
+| name     | text not null                                                |
+| color    | text not null default 'gray' (ключ из фиксированной палитры) |
+| icon     | text null (ключ из фиксированного реестра иконок фронтенда)  |
+| position | integer not null                                             |
 
 Индекс: `unique(user_id, lower(name))`. Тег создаётся неявно при первом использовании в задаче, удаляется — только явно пользователем.
 

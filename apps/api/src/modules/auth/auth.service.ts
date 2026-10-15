@@ -64,11 +64,20 @@ export class AuthService {
       throw new UnauthorizedException({ description: "Сессия истекла, войдите снова" });
     }
 
-    const user = await this.usersService.getById(row.userId);
-    await this.db
+    // Ротация атомарна: условный update «отзовём, если ещё не отозван».
+    // Два параллельных refresh одним токеном — победит один; проигравший
+    // считается повторным использованием (см. REFRESH_REUSE_MESSAGE).
+    const rotated = await this.db
       .update(refreshTokens)
       .set({ revokedAt: new Date() })
-      .where(eq(refreshTokens.id, row.id));
+      .where(and(eq(refreshTokens.id, row.id), isNull(refreshTokens.revokedAt)))
+      .returning({ id: refreshTokens.id });
+    if (rotated.length === 0) {
+      await this.revokeAll(row.userId);
+      throw new UnauthorizedException({ description: REFRESH_REUSE_MESSAGE });
+    }
+
+    const user = await this.usersService.getById(row.userId);
     return this.issueSession(user, row.userAgent ?? undefined);
   }
 

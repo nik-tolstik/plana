@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { userSchema, type UserDto, type UserTheme } from "@plana/shared";
-import { apiClient } from "@/shared/api/client";
+import type { UserTheme } from "@plana/shared";
+import { useUpdateUser } from "@/entities/user";
 import { Segmented } from "@/shared/ui";
 import { applyTheme, currentTheme } from "../model/theme";
 
@@ -11,16 +11,24 @@ const OPTIONS: Array<{ value: UserTheme; label: string }> = [
 ];
 
 /** Переключатель темы из 3 режимов. Выбранная тема синхронизируется с профилем. */
-export function ThemeSwitch({ onUserUpdated }: { onUserUpdated?: (user: UserDto) => void }) {
-  const [theme, setTheme] = useState<UserTheme>(currentTheme());
+export function ThemeSwitch() {
+  const [theme, setTheme] = useState<UserTheme>(currentTheme);
+  const updateUser = useUpdateUser();
 
   function select(next: UserTheme) {
+    const previous = theme;
     setTheme(next);
     applyTheme(next);
-    apiClient
-      .patch("/v1/me", userSchema, { theme: next })
-      .then(onUserUpdated)
-      .catch(() => undefined);
+    // Сервер не подтвердил — возвращаем выбор, чтобы UI не врал о профиле.
+    updateUser.mutate(
+      { theme: next },
+      {
+        onError: () => {
+          setTheme(previous);
+          applyTheme(previous);
+        },
+      },
+    );
   }
 
   return (

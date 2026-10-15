@@ -1,6 +1,6 @@
 import type { FolderDto } from "@plana/shared";
 import { createFolderSchema, folderSchema, patchFolderSchema } from "@plana/shared";
-import { apiClient } from "@/shared/api/client";
+import { apiClient } from "@/shared/api";
 
 export function apiCreateFolder(input: typeof createFolderSchema._input): Promise<FolderDto> {
   return apiClient.post("/v1/folders", folderSchema, input);

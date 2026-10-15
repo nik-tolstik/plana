@@ -2,13 +2,14 @@ import { useState } from "react";
 import { CalendarIcon, CheckIcon, ChevronDownIcon, FlagIcon, PlusIcon } from "lucide-react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { TASK_PRIORITIES, TASK_PRIORITY_LABELS_RU, type TaskPriority } from "@plana/shared";
+import { TASK_PRIORITIES, type TaskPriority } from "@plana/shared";
 import { useTagsQuery } from "@/entities/tag";
 import { useCreateTask } from "@/features/task-manage";
 import { errorMessage } from "@/shared/lib/error-message";
 import { cn } from "@/shared/lib/cn";
 import { DateTimePicker, ENTITY_COLORS, Input, Popover } from "@/shared/ui";
 import { PRIORITY_CLASS } from "@/shared/lib/priority-class";
+import { TASK_PRIORITY_LABELS_RU } from "@/shared/lib/priority-labels";
 
 interface QuickAddProps {
   listId?: string;
