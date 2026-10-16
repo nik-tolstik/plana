@@ -1,17 +1,21 @@
 import {
-  CalendarIcon,
+  CalendarOffIcon,
+  CalendarRangeIcon,
   CheckIcon,
   FlagIcon,
   ListIcon,
+  ListPlusIcon,
   RotateCcwIcon,
+  SunIcon,
+  SunriseIcon,
   TrashIcon,
 } from "lucide-react";
 import {
-  TASK_PRIORITIES,
   addDays,
   type ListDto,
   type PatchTaskDto,
   type TaskDto,
+  type TaskPriority,
 } from "@plana/shared";
 import { cn } from "@/shared/lib/cn";
 import { PRIORITY_CLASS } from "@/shared/lib/priority-class";
@@ -24,30 +28,38 @@ export interface TaskRowMenuActions {
   remove: () => void;
   restoreFromTrash: () => void;
   patchTask: (input: PatchTaskDto) => void;
+  /** Раскрыть строку и включить ввод новой подзадачи. */
+  startSubtask: () => void;
 }
 
 interface TaskRowMenuArgs extends TaskRowMenuActions {
   task: TaskDto;
   /** Сегодня в таймзоне пользователя — для пресетов даты. */
   todayIso: string;
-  /** Подпись текущей дедлайна (для подсказки в пункте «Дата»). */
-  dueLabel: string | null;
   /** Все списки пользователя (Inbox + корень + папки). */
   allLists: ListDto[];
 }
 
-/** Пункты контекстного меню строки: завершение, дата, приоритет, список, корзина. */
+/** Порядок как в меню TickTick: от высокого к «без приоритета». */
+const MENU_PRIORITY_ORDER: TaskPriority[] = ["high", "medium", "low", "none"];
+
+/**
+ * Пункты контекстного меню строки: ряды быстрых кнопок (дата, приоритет),
+ * затем действия — завершение, подзадача, перенос по спискам, корзина.
+ */
 export function buildTaskRowMenu({
   task,
   todayIso,
-  dueLabel,
   allLists,
   toggleComplete,
   remove,
   restoreFromTrash,
   patchTask,
+  startSubtask,
 }: TaskRowMenuArgs): ContextMenuItem[] {
   const currentList = allLists.find((list) => list.id === task.listId);
+  const tomorrow = addDays(todayIso, 1);
+  const nextWeek = addDays(todayIso, 7);
 
   const menuItems: ContextMenuItem[] = [
     {
@@ -63,50 +75,66 @@ export function buildTaskRowMenu({
 
   if (task.trashedAt === null) {
     menuItems.push(
+      { separator: true, label: "" },
       {
         label: "Дата",
-        icon: <CalendarIcon className="size-4" />,
-        hint: dueLabel ?? "нет",
-        submenu: [
+        quickOptions: [
           {
+            key: "today",
             label: "Сегодня",
-            icon: task.dueDate === todayIso ? <CheckIcon className="size-4" /> : undefined,
+            icon: <SunIcon className="size-4" />,
+            active: task.dueDate === todayIso,
             onSelect: () => void patchTask({ dueDate: todayIso }),
           },
           {
+            key: "tomorrow",
             label: "Завтра",
-            icon:
-              task.dueDate === addDays(todayIso, 1) ? <CheckIcon className="size-4" /> : undefined,
-            onSelect: () => void patchTask({ dueDate: addDays(todayIso, 1) }),
+            icon: <SunriseIcon className="size-4" />,
+            active: task.dueDate === tomorrow,
+            onSelect: () => void patchTask({ dueDate: tomorrow }),
           },
           {
+            key: "next-week",
             label: "Следующая неделя",
-            icon:
-              task.dueDate === addDays(todayIso, 7) ? <CheckIcon className="size-4" /> : undefined,
-            onSelect: () => void patchTask({ dueDate: addDays(todayIso, 7) }),
+            icon: <CalendarRangeIcon className="size-4" />,
+            active: task.dueDate === nextWeek,
+            onSelect: () => void patchTask({ dueDate: nextWeek }),
           },
           {
+            key: "no-date",
             label: "Без даты",
-            icon: task.dueDate === null ? <CheckIcon className="size-4" /> : undefined,
+            icon: <CalendarOffIcon className="size-4" />,
+            active: task.dueDate === null,
             onSelect: () => void patchTask({ dueDate: null }),
           },
         ],
       },
       {
         label: "Приоритет",
-        icon: <FlagIcon className="size-4" />,
-        hint: TASK_PRIORITY_LABELS_RU[task.priority],
-        submenu: TASK_PRIORITIES.map((priority) => ({
+        quickOptions: MENU_PRIORITY_ORDER.map((priority) => ({
+          key: priority,
           label: TASK_PRIORITY_LABELS_RU[priority],
-          icon:
-            priority === task.priority ? (
-              <FlagIcon className={cn("size-4 fill-current", PRIORITY_CLASS[priority])} />
-            ) : undefined,
+          icon: (
+            <FlagIcon
+              className={cn(
+                "size-4",
+                priority === "none" ? undefined : "fill-current",
+                PRIORITY_CLASS[priority] || undefined,
+              )}
+            />
+          ),
+          active: task.priority === priority,
           onSelect: () => void patchTask({ priority }),
         })),
       },
+      { separator: true, label: "" },
       {
-        label: "Список",
+        label: "Добавить подзадачу",
+        icon: <ListPlusIcon className="size-4" />,
+        onSelect: startSubtask,
+      },
+      {
+        label: "Переместить в",
         icon: <ListIcon className="size-4" />,
         hint: currentList?.name,
         submenu: allLists.map((list) => ({

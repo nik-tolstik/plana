@@ -109,7 +109,13 @@ export function ListPage() {
           <p className="text-destructive">Не удалось загрузить задачи</p>
         ) : null}
 
-        <TaskListView groups={groups} today={today} onOpenDetails={setDetailsTaskId} dnd={dnd} />
+        <TaskListView
+          groups={groups}
+          today={today}
+          activeTaskId={detailsTaskId}
+          onOpenDetails={setDetailsTaskId}
+          dnd={dnd}
+        />
 
         {!tasksQuery.isPending && tasks.length === 0 ? (
           <p className="py-8 text-center text-muted-foreground">В этом списке пока нет задач</p>

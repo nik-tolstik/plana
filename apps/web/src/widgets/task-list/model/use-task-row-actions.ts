@@ -28,9 +28,12 @@ export function useTaskRowActions({ task, onEditingChange }: TaskRowActionsArgs)
   const [titleDraft, setTitleDraft] = useState(task.title);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
-  // Завершение: сначала проигрываем галочку и схлопывание строки,
-  // только потом PATCH — иначе задача исчезает из списка раньше анимации.
-  const [completing, setCompleting] = useState(false);
+  // Завершение в два такта: сначала галочка чекбокса (checking), затем
+  // схлопывание строки (collapsing) — и только потом PATCH. Одновременный
+  // старт обрезает анимацию галочки: строка исчезает раньше, чем она доиграет.
+  const [completeStage, setCompleteStage] = useState<"idle" | "checking" | "collapsing">("idle");
+  const completing = completeStage !== "idle";
+  const collapsing = completeStage === "collapsing";
   const prefersReducedMotion = useReducedMotion();
 
   const complete = useCompleteTask();
@@ -47,21 +50,29 @@ export function useTaskRowActions({ task, onEditingChange }: TaskRowActionsArgs)
   }, [task.title]);
 
   async function toggleComplete() {
-    try {
-      if (task.completedAt === null) {
-        setCompleting(true);
+    if (completeStage !== "idle") return;
+    if (task.completedAt === null) {
+      setCompleteStage("checking");
+      try {
         if (!prefersReducedMotion) {
-          // Галочка + схлопывание строки успевают проиграться до PATCH.
-          await new Promise((resolve) => setTimeout(resolve, 450));
+          // Такт 1: галочка доигрывает spring (~300 мс) на месте строки.
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          setCompleteStage("collapsing");
+          // Такт 2: строка сворачивается (0.22 с в task-row), затем PATCH.
+          await new Promise((resolve) => setTimeout(resolve, 240));
         }
         await complete.mutateAsync(task.id);
-        setCompleting(false);
-      } else {
-        await uncomplete.mutateAsync(task.id);
+      } catch (cause) {
+        setError(errorMessage(cause));
+      } finally {
+        setCompleteStage("idle");
       }
-    } catch (cause) {
-      setCompleting(false);
-      setError(errorMessage(cause));
+    } else {
+      try {
+        await uncomplete.mutateAsync(task.id);
+      } catch (cause) {
+        setError(errorMessage(cause));
+      }
     }
   }
 
@@ -190,6 +201,7 @@ export function useTaskRowActions({ task, onEditingChange }: TaskRowActionsArgs)
     setDraft,
     error,
     completing,
+    collapsing,
     toggleComplete,
     remove,
     restoreFromTrash,

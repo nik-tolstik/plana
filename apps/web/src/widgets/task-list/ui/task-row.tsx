@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { RepeatIcon } from "lucide-react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { todayInZone, type TaskDto } from "@plana/shared";
 import { useSidebarQuery } from "@/entities/list";
 import { useUserTimezone } from "@/entities/user";
@@ -22,6 +23,8 @@ interface TaskRowProps {
   showOverdue?: boolean;
   /** Страница задаёт дату («Сегодня»/«Завтра») — чип даты избыточен. */
   hideDateChip?: boolean;
+  /** Задача открыта в панели деталей — строка подсвечена фоном. */
+  active?: boolean;
   onOpenDetails: (taskId: string) => void;
   /** Перетаскивание (только страницы списков). */
   dnd?: TaskDragProps;
@@ -30,12 +33,29 @@ interface TaskRowProps {
   onEditingChange?: (editing: TaskEditingState | null) => void;
 }
 
+/**
+ * Смещение символа под точкой клика внутри названия: каретка инпута
+ * встанет туда, куда нажал пользователь. Chromium/Safari — caretRangeFromPoint,
+ * Firefox — caretPositionFromPoint; промах по тексту → undefined (каретка в конец).
+ */
+function titleCaretAtPoint(event: ReactMouseEvent<HTMLElement>): number | undefined {
+  if (typeof document.caretRangeFromPoint === "function") {
+    const range = document.caretRangeFromPoint(event.clientX, event.clientY);
+    if (range && range.startContainer.nodeType === Node.TEXT_NODE) return range.startOffset;
+    return undefined;
+  }
+  const position = document.caretPositionFromPoint?.(event.clientX, event.clientY);
+  if (position && position.offsetNode.nodeType === Node.TEXT_NODE) return position.offset;
+  return undefined;
+}
+
 /** Строка задачи: чекбокс, название, чипы, подзадачи, инлайн-режимы. */
 export function TaskRow({
   task,
   today,
   showOverdue = true,
   hideDateChip = false,
+  active = false,
   onOpenDetails,
   dnd,
   editing = null,
@@ -54,6 +74,7 @@ export function TaskRow({
     setDraft,
     error,
     completing,
+    collapsing,
     toggleComplete,
     remove,
     restoreFromTrash,
@@ -89,12 +110,16 @@ export function TaskRow({
   const menuItems = buildTaskRowMenu({
     task,
     todayIso,
-    dueLabel,
     allLists,
     toggleComplete,
     remove,
     restoreFromTrash,
     patchTask,
+    startSubtask: () => {
+      setDraft("");
+      setExpanded(true);
+      onEditingChange({ taskId: task.id, mode: "new-subtask" });
+    },
   });
 
   return (
@@ -119,6 +144,7 @@ export function TaskRow({
           className={cn(
             "group relative flex flex-col rounded-lg",
             task.completedAt !== null && "opacity-60",
+            active && task.completedAt === null && "bg-surface-selected",
             dnd?.draggingId === task.id && "opacity-40",
             overZone === "inside" && "bg-surface-selected",
           )}
@@ -151,7 +177,7 @@ export function TaskRow({
             className="flex flex-col"
             initial={false}
             animate={
-              completing && !prefersReducedMotion
+              collapsing && !prefersReducedMotion
                 ? { height: 0, opacity: 0 }
                 : { height: "auto", opacity: 1 }
             }
@@ -171,6 +197,7 @@ export function TaskRow({
                   value={titleDraft}
                   placeholder="Название задачи"
                   ariaLabel="Редактирование названия задачи"
+                  initialCaret={editing?.titleCaret}
                   onChange={setTitleDraft}
                   onCommit={handleTitleEnter}
                   onShiftEnter={handleTitleShiftEnter}
@@ -194,46 +221,55 @@ export function TaskRow({
                   onClick={(event) => {
                     event.stopPropagation();
                     setTitleDraft(task.title);
-                    onEditingChange({ taskId: task.id, mode: "title" });
+                    onEditingChange({
+                      taskId: task.id,
+                      mode: "title",
+                      titleCaret: titleCaretAtPoint(event),
+                    });
                   }}
                 >
                   {task.title}
                 </button>
               )}
 
-              {/* Распорка: индикаторы прижаты вправо, клик по ней открывает панель. */}
-              <span aria-hidden className="min-w-0 flex-1" />
-              <TaskTagsChip task={task} onPatch={(input) => void patchTask(input)} />
-              <TaskPriorityChip task={task} onPatch={(input) => void patchTask(input)} />
-              {task.rrule !== null ? (
-                <RepeatIcon
-                  className="size-3.5 shrink-0 text-muted-foreground"
-                  aria-label={rruleValueLabel(task.rrule)}
-                />
-              ) : null}
-              {hideDateChip ? null : (
-                <TaskDateChip
-                  task={task}
-                  overdue={overdue}
-                  label={dueLabel}
-                  onPatch={(input) => void patchTask(input)}
-                />
+              {/* Индикаторы прижаты вправо; в правке названия уступают
+                  место инпуту — он растягивается на всю ширину строки. */}
+              {mode === "title" ? null : (
+                <>
+                  <span aria-hidden className="min-w-0 flex-1" />
+                  <TaskTagsChip task={task} onPatch={(input) => void patchTask(input)} />
+                  <TaskPriorityChip task={task} onPatch={(input) => void patchTask(input)} />
+                  {task.rrule !== null ? (
+                    <RepeatIcon
+                      className="size-3.5 shrink-0 text-muted-foreground"
+                      aria-label={rruleValueLabel(task.rrule)}
+                    />
+                  ) : null}
+                  {hideDateChip ? null : (
+                    <TaskDateChip
+                      task={task}
+                      overdue={overdue}
+                      label={dueLabel}
+                      onPatch={(input) => void patchTask(input)}
+                    />
+                  )}
+                  {/* Счётчик-переключатель блока подзадач; пустой блок не показываем —
+                      подзадачи добавляются Shift+Enter в правке названия. */}
+                  {task.subtasks.length > 0 ? (
+                    <button
+                      className="shrink-0 cursor-pointer rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground"
+                      title="Подзадачи"
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setExpanded((value) => !value);
+                      }}
+                    >
+                      {doneCount}/{task.subtasks.length}
+                    </button>
+                  ) : null}
+                </>
               )}
-              {/* Счётчик-переключатель блока подзадач; пустой блок не показываем —
-                  подзадачи добавляются Shift+Enter в правке названия. */}
-              {task.subtasks.length > 0 ? (
-                <button
-                  className="shrink-0 cursor-pointer rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-control-hover hover:text-foreground"
-                  title="Подзадачи"
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setExpanded((value) => !value);
-                  }}
-                >
-                  {doneCount}/{task.subtasks.length}
-                </button>
-              ) : null}
             </div>
 
             {mode === "new-task" ? (

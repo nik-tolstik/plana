@@ -3,7 +3,7 @@ import { cn } from "@/shared/lib/cn";
 
 /**
  * Управляемая однострочная (растущая по контенту) строка ввода инлайн-режимов.
- * Фокус и каретка в конец при монтировании.
+ * Фокус при монтировании; каретка — в переданную позицию, иначе в конец.
  */
 export function InlineInput({
   className,
@@ -11,6 +11,7 @@ export function InlineInput({
   placeholder,
   ariaLabel,
   autoFocus = true,
+  initialCaret,
   onChange,
   onCommit,
   onShiftEnter,
@@ -22,6 +23,8 @@ export function InlineInput({
   placeholder: string;
   ariaLabel: string;
   autoFocus?: boolean;
+  /** Позиция каретки при монтировании (например, место клика по названию). */
+  initialCaret?: number;
   onChange: (value: string) => void;
   onCommit: () => void;
   onShiftEnter?: () => void;
@@ -34,10 +37,14 @@ export function InlineInput({
     const node = ref.current;
     if (!node || !autoFocus) return;
     node.focus();
-    node.setSelectionRange(node.value.length, node.value.length);
+    const caret =
+      initialCaret !== undefined && initialCaret >= 0 && initialCaret <= node.value.length
+        ? initialCaret
+        : node.value.length;
+    node.setSelectionRange(caret, caret);
     node.style.height = "auto";
     node.style.height = `${node.scrollHeight}px`;
-  }, [autoFocus]);
+  }, [autoFocus, initialCaret]);
 
   return (
     <textarea

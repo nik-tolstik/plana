@@ -15,6 +15,20 @@ export interface ContextMenuItem {
   submenu?: ContextMenuItem[];
   /** Текущее значение справа от пункта (например «Сегодня»). */
   hint?: string;
+  /** Ряд иконочных кнопок быстрого выбора под заголовком label (дата/приоритет). */
+  quickOptions?: ContextMenuQuickOption[];
+  /** Горизонтальный разделитель вместо пунка меню. */
+  separator?: boolean;
+}
+
+/** Кнопка ряда быстрого выбора: иконка + всплывающая подсказка. */
+export interface ContextMenuQuickOption {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  /** Текущее значение ряда — подсвечивается фоном. */
+  active?: boolean;
+  onSelect: () => void;
 }
 
 interface ContextMenuProps {
@@ -80,7 +94,41 @@ export function ContextMenu({ items, children }: ContextMenuProps) {
             <span className="min-w-0 truncate text-sm font-medium">{parent.label}</span>
           </div>
         ) : null}
-        {level.map((item) => {
+        {level.map((item, index) => {
+          if (item.separator) {
+            return <div aria-hidden className="mx-1 my-1 h-px bg-border" key={`sep-${index}`} />;
+          }
+          if (item.quickOptions) {
+            return (
+              <div className="px-1 py-1" key={item.label}>
+                <p className="px-2 pb-1 text-xs font-medium text-muted-foreground">{item.label}</p>
+                <div className="flex items-center gap-1">
+                  {item.quickOptions.map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={option.active}
+                      aria-label={option.label}
+                      title={option.label}
+                      onClick={() => {
+                        setOpen(false);
+                        option.onSelect();
+                      }}
+                      className={cn(
+                        "flex size-8 cursor-pointer items-center justify-center rounded-lg outline-none transition-colors hover:bg-option-hover focus-visible:bg-option-hover",
+                        option.active
+                          ? "bg-option-selected text-foreground"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {option.icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          }
           const hasSubmenu = item.submenu !== undefined && item.submenu.length > 0;
           return (
             <button

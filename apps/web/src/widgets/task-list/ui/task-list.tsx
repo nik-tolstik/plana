@@ -10,6 +10,8 @@ interface TaskListViewProps {
   today: string;
   /** Страница задаёт дату («Сегодня»/«Завтра») — чип даты в строках скрыт. */
   hideDateChip?: boolean;
+  /** Задача открыта в панели деталей — её строка подсвечена фоном. */
+  activeTaskId?: string | null;
   onOpenDetails: (taskId: string) => void;
   dnd?: TaskDragProps;
 }
@@ -19,6 +21,7 @@ export function TaskListView({
   groups,
   today,
   hideDateChip = false,
+  activeTaskId = null,
   onOpenDetails,
   dnd,
 }: TaskListViewProps) {
@@ -36,6 +39,7 @@ export function TaskListView({
           key={group.key}
           today={today}
           hideDateChip={hideDateChip}
+          activeTaskId={activeTaskId}
           onOpenDetails={onOpenDetails}
           dnd={dnd}
           editing={editing}

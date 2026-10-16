@@ -56,7 +56,12 @@ export function TagPage() {
           <p className="text-destructive">Не удалось загрузить задачи</p>
         ) : null}
 
-        <TaskListView groups={groups} today={today} onOpenDetails={setDetailsTaskId} />
+        <TaskListView
+          groups={groups}
+          today={today}
+          activeTaskId={detailsTaskId}
+          onOpenDetails={setDetailsTaskId}
+        />
 
         {!tasksQuery.isPending && tasks.length === 0 ? (
           <p className="py-8 text-center text-muted-foreground">Задач с этим тегом нет</p>

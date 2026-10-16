@@ -68,6 +68,7 @@ export function SmartPage({ smart }: SmartPageProps) {
           groups={groups}
           today={today}
           hideDateChip={smart === "today" || smart === "tomorrow"}
+          activeTaskId={detailsTaskId}
           onOpenDetails={setDetailsTaskId}
         />
 

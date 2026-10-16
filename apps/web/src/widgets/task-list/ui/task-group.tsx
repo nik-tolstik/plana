@@ -12,6 +12,8 @@ interface TaskGroupBlockProps {
   today: string;
   /** Страница задаёт дату («Сегодня»/«Завтра») — чип даты в строках скрыт. */
   hideDateChip?: boolean;
+  /** Задача открыта в панели деталей — её строка подсвечена фоном. */
+  activeTaskId?: string | null;
   onOpenDetails: (taskId: string) => void;
   dnd?: TaskDragProps;
   editing?: TaskEditingState | null;
@@ -23,6 +25,7 @@ export function TaskGroupBlock({
   group,
   today,
   hideDateChip = false,
+  activeTaskId = null,
   onOpenDetails,
   dnd,
   editing,
@@ -68,6 +71,7 @@ export function TaskGroupBlock({
                   task={task}
                   today={today}
                   hideDateChip={hideDateChip}
+                  active={activeTaskId === task.id}
                   onOpenDetails={onOpenDetails}
                   dnd={dnd}
                   editing={editing}
